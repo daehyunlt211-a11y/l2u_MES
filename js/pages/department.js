@@ -148,6 +148,7 @@ export async function departmentManager(root) {
     body.innerHTML = `
       <div class="field col-2"><label>부서</label><input class="input" value="${escapeHtml(dept.name)}" readonly></div>
       <div class="field"><label>로그인 아이디 <span class="req">*</span></label><input class="input" name="login_id" value="${escapeHtml(v('login_id'))}" ${isEdit ? 'readonly' : ''}></div>
+      <div class="field"><label>비밀번호</label><input class="input" type="password" name="password" autocomplete="new-password" placeholder="${isEdit ? '변경 시에만 입력' : '로그인 비밀번호'}"></div>
       <div class="field"><label>이름 <span class="req">*</span></label><input class="input" name="name" value="${escapeHtml(v('name'))}"></div>
       <div class="field"><label>직급</label><input class="input" name="position" value="${escapeHtml(v('position'))}"></div>
       <div class="field"><label>권한</label><select class="select" name="role">${ROLES.map(o => `<option value="${o.value}" ${v('role', 'user') === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}</select></div>
@@ -163,6 +164,7 @@ export async function departmentManager(root) {
           const g = (n) => body.querySelector(`[name="${n}"]`).value.trim();
           if (!g('login_id') || !g('name')) { toast('아이디와 이름은 필수입니다.', 'error'); return; }
           const payload = { login_id: g('login_id'), name: g('name'), department: dept.name, position: g('position'), role: g('role'), email: g('email'), phone: g('phone'), use_yn: body.querySelector('[name="use_yn"]').checked };
+          if (g('password')) payload.password = g('password'); // 입력했을 때만 반영(수정 시 빈칸이면 기존 유지)
           try {
             if (isEdit) await db.update('users', user.id, payload);
             else await db.insert('users', payload);

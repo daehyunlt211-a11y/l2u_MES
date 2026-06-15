@@ -1,12 +1,15 @@
 // 기준정보관리: 사용자/부서/거래처/품목/표준공정/제품별표준공정/공구/설비
 import { createCrudPage } from '../lib/crud.js';
 import { num } from '../lib/format.js';
+import { badge } from '../ui/components.js';
 
 // 1-1 사용자관리
 export const users = createCrudPage({
-  table: 'users', title: '사용자관리', subtitle: '시스템 사용자 계정과 권한을 관리합니다.',
+  table: 'users', title: '사용자관리', subtitle: '시스템 사용자 계정·비밀번호·권한을 관리합니다.',
   searchFields: ['login_id', 'name', 'department', 'email'], searchPlaceholder: '아이디·이름·부서 검색',
   defaultSort: { key: 'login_id', dir: 'asc' },
+  // 비밀번호를 입력하지 않으면 전송하지 않음(수정 시 기존 유지, 미입력 신규 등록 허용)
+  beforeSave: (data) => { if (data.password === '' || data.password == null) delete data.password; },
   filters: [
     { key: 'role', label: '권한', options: [{ value: 'admin', label: '관리자' }, { value: 'manager', label: '매니저' }, { value: 'user', label: '일반' }] },
     { key: 'department', label: '부서', options: ['경영지원팀', '영업팀', '생산팀', '품질팀', '자재팀'] },
@@ -17,12 +20,14 @@ export const users = createCrudPage({
     { key: 'department', label: '부서' },
     { key: 'position', label: '직급' },
     { key: 'role', label: '권한', type: 'badge', render: (r) => ({ admin: '관리자', manager: '매니저', user: '일반' }[r.role] || r.role) },
+    { key: 'password', label: '비밀번호', align: 'center', csv: (r) => (r.password ? '설정' : '미설정'), render: (r) => (r.password ? badge('설정', 'success') : badge('미설정', 'neutral')) },
     { key: 'email', label: '이메일' },
     { key: 'phone', label: '연락처' },
     { key: 'use_yn', label: '사용', type: 'yesno', align: 'center' },
   ],
   fields: [
     { key: 'login_id', label: '로그인 아이디', required: true },
+    { key: 'password', label: '비밀번호', type: 'password', placeholder: '로그인 비밀번호 (수정 시 변경할 때만 입력)' },
     { key: 'name', label: '이름', required: true },
     { key: 'department', label: '부서', ref: { table: 'departments', value: 'name', label: (r) => `${r.code} · ${r.name}` }, placeholder: '부서 선택' },
     { key: 'position', label: '직급' },

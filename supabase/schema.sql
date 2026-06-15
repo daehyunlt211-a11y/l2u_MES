@@ -37,6 +37,7 @@ create table if not exists departments (
 create table if not exists users (
   id          uuid primary key default uuid_generate_v4(),
   login_id    text unique not null,
+  password    text,                            -- 로그인 비밀번호 (운영 시 해시/__Supabase Auth 권장)
   name        text not null,
   department  text,
   position    text,

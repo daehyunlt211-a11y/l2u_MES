@@ -15,12 +15,12 @@ insert into departments (code, name, manager, phone, use_yn) values
 on conflict (code) do nothing;
 
 -- ---------- 1-1 사용자 (5) ----------
-insert into users (login_id, name, department, position, role, email, phone, use_yn) values
-  ('admin','관리자','경영지원팀','대표','admin','admin@linktours.co.kr','010-1111-1111', true),
-  ('sales01','이영업','영업팀','팀장','manager','sales@linktours.co.kr','010-2222-2222', true),
-  ('prod01','박생산','생산팀','팀장','manager','prod@linktours.co.kr','010-3333-3333', true),
-  ('qa01','최품질','품질팀','주임','user','qa@linktours.co.kr','010-4444-4444', true),
-  ('mat01','정자재','자재팀','주임','user','mat@linktours.co.kr','010-5555-5555', true)
+insert into users (login_id, password, name, department, position, role, email, phone, use_yn) values
+  ('admin','admin','관리자','경영지원팀','대표','admin','admin@linktours.co.kr','010-1111-1111', true),
+  ('sales01','1234','이영업','영업팀','팀장','manager','sales@linktours.co.kr','010-2222-2222', true),
+  ('prod01','1234','박생산','생산팀','팀장','manager','prod@linktours.co.kr','010-3333-3333', true),
+  ('qa01','1234','최품질','품질팀','주임','user','qa@linktours.co.kr','010-4444-4444', true),
+  ('mat01','1234','정자재','자재팀','주임','user','mat@linktours.co.kr','010-5555-5555', true)
 on conflict (login_id) do nothing;
 
 -- ---------- 1-3 거래처 (5) ----------

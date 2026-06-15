@@ -5,6 +5,7 @@ import { db } from '../lib/db.js';
 import { num, escapeHtml, todayStr, nextDocNo } from '../lib/format.js';
 import { badge, toast, openModal, confirmDialog } from '../ui/components.js';
 import { icon } from '../ui/icons.js';
+import { openNonconformanceForm } from './nonconformanceForm.js';
 
 // 마지막 선택 작업자(시작 모달 기본값) 기억
 const WORKER_KEY = 'mes_pop_worker';
@@ -125,7 +126,10 @@ export async function popDetail(root, params = {}) {
     const progPct = procs.length ? Math.round(doneCnt / procs.length * 100) : 0;
 
     root.innerHTML = `
-      ${backBar()}
+      <div class="flex between" style="margin-bottom:16px">
+        <button class="btn" id="pop-back">${icon('chevronLeft', 16)} 작업지시 목록</button>
+        <button class="btn btn--danger" id="pop-ncr">${icon('alert', 16)} 부적합 등록</button>
+      </div>
       <div class="pop-detail-head">
         <div>
           <div class="d-no">${escapeHtml(wo.wo_no)}</div>
@@ -141,7 +145,18 @@ export async function popDetail(root, params = {}) {
       <div class="progress" style="height:10px;margin-bottom:18px"><span style="width:${progPct}%"></span></div>
       <div id="proc-list"></div>`;
     bindBack(root);
+    root.querySelector('#pop-ncr').onclick = () => openNcr();
     renderProcs();
+  }
+
+  // 부적합 등록 (부적합관리와 동일한 팝업), 작업지시 정보 프리필
+  function openNcr(proc) {
+    openNonconformanceForm({
+      prefill: {
+        occur_date: todayStr(), process: proc?.process_name || '', item_code: wo.item_code, item_name: wo.item_name,
+        defect_qty: proc?.defect_qty || 0, worker: proc?.worker || getWorker(), status: '처리중',
+      },
+    });
   }
 
   function renderProcs() {
@@ -260,6 +275,11 @@ export async function popDetail(root, params = {}) {
             close();
             toast(`[${p.process_name}] 종료 — 생산실적이 등록되었습니다.`);
             render();
+            // 불량 발생 시 부적합 등록 팝업(부적합관리와 동일) 자동 안내
+            if (defect > 0) {
+              const ok = await confirmDialog({ title: '부적합 등록', message: `불량 ${num(defect)}EA 가 발생했습니다. 부적합 등록을 진행하시겠습니까?`, confirmText: '부적합 등록', danger: false });
+              if (ok) openNcr({ ...p, defect_qty: defect });
+            }
           } catch (e) { toast(e.message || '종료 실패', 'error'); }
         };
       },

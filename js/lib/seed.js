@@ -14,11 +14,11 @@ export const SEED = {
     { code: 'D500', name: '자재팀', manager: '정자재', phone: '02-1000-5000', use_yn: true },
   ],
   users: [
-    { login_id: 'admin', name: '관리자', department: '경영지원팀', position: '대표', role: 'admin', email: 'admin@linktours.co.kr', phone: '010-1111-1111', use_yn: true },
-    { login_id: 'sales01', name: '이영업', department: '영업팀', position: '팀장', role: 'manager', email: 'sales@linktours.co.kr', phone: '010-2222-2222', use_yn: true },
-    { login_id: 'prod01', name: '박생산', department: '생산팀', position: '팀장', role: 'manager', email: 'prod@linktours.co.kr', phone: '010-3333-3333', use_yn: true },
-    { login_id: 'qa01', name: '최품질', department: '품질팀', position: '주임', role: 'user', email: 'qa@linktours.co.kr', phone: '010-4444-4444', use_yn: true },
-    { login_id: 'mat01', name: '정자재', department: '자재팀', position: '주임', role: 'user', email: 'mat@linktours.co.kr', phone: '010-5555-5555', use_yn: true },
+    { login_id: 'admin', password: 'admin', name: '관리자', department: '경영지원팀', position: '대표', role: 'admin', email: 'admin@linktours.co.kr', phone: '010-1111-1111', use_yn: true },
+    { login_id: 'sales01', password: '1234', name: '이영업', department: '영업팀', position: '팀장', role: 'manager', email: 'sales@linktours.co.kr', phone: '010-2222-2222', use_yn: true },
+    { login_id: 'prod01', password: '1234', name: '박생산', department: '생산팀', position: '팀장', role: 'manager', email: 'prod@linktours.co.kr', phone: '010-3333-3333', use_yn: true },
+    { login_id: 'qa01', password: '1234', name: '최품질', department: '품질팀', position: '주임', role: 'user', email: 'qa@linktours.co.kr', phone: '010-4444-4444', use_yn: true },
+    { login_id: 'mat01', password: '1234', name: '정자재', department: '자재팀', position: '주임', role: 'user', email: 'mat@linktours.co.kr', phone: '010-5555-5555', use_yn: true },
   ],
   partners: [
     { code: 'C001', name: '(주)현대정밀', biz_type: '매출처', biz_no: '123-45-67890', ceo: '현대표', manager: '김구매', phone: '031-100-1000', email: 'buy@hd.com', address: '경기도 화성시', use_yn: true },

@@ -9,7 +9,7 @@ export const SUPABASE_URL = 'https://uofznxvvwebxqroubpgk.supabase.co';      // 
 export const SUPABASE_ANON_KEY = 'sb_publishable_zcJGOH7MVUuvMWnyab5SWA_gqeSUiGd'; // 예: 'eyJhbGci...'
 
 export const APP_CONFIG = {
-  appName: 'LINKTOURS MES',
+  appName: 'LINK2US MES',
   company: '링크투어스(주)',
   version: '1.0.0',
 };

@@ -322,9 +322,10 @@ export function createCrudPage(cfg) {
         return `<div class="field ${span}"><label>${escapeHtml(f.label)}</label>
           <label class="switch"><input type="checkbox" name="${f.key}" ${checked}/><span class="switch__track"></span><span class="muted" data-switch-label>${val === false ? '미사용' : '사용'}</span></label></div>`;
       } else {
-        const type = f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text';
+        const type = f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : f.type === 'password' ? 'password' : 'text';
         const step = f.type === 'number' ? (f.step ? `step="${f.step}"` : 'step="any"') : '';
-        control = `<input class="input" type="${type}" name="${f.key}" value="${escapeHtml(val ?? '')}" ${step} placeholder="${escapeHtml(f.placeholder || '')}" ${f.required ? 'required' : ''} ${f.readonly ? 'readonly' : ''} ${f.attrs || ''}/>`;
+        const auto = f.type === 'password' ? 'autocomplete="new-password"' : '';
+        control = `<input class="input" type="${type}" name="${f.key}" value="${escapeHtml(val ?? '')}" ${step} ${auto} placeholder="${escapeHtml(f.placeholder || '')}" ${f.required ? 'required' : ''} ${f.readonly ? 'readonly' : ''} ${f.attrs || ''}/>`;
       }
       return `<div class="field ${span}" data-field="${f.key}"><label>${escapeHtml(f.label)} ${reqMark}</label>${control}<div class="field__err hidden"></div></div>`;
     }
