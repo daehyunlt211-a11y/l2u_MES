@@ -3,10 +3,13 @@ import { MENU, ROUTES, DEFAULT_ROUTE } from './routes.js';
 import { icon } from './ui/icons.js';
 import { IS_DEMO, db } from './lib/db.js';
 import { APP_CONFIG } from './config.js';
-import { toast, confirmDialog } from './ui/components.js';
+import { toast, confirmDialog, openModal } from './ui/components.js';
 import { escapeHtml } from './lib/format.js';
+import { getCurrentUser, login, logout, changeMyPassword } from './lib/auth.js';
 
 const app = document.getElementById('app');
+const initial = (s) => escapeHtml(String(s || '?').trim().slice(0, 1).toUpperCase());
+const roleLabel = (r) => ({ admin: '관리자', manager: '매니저', user: '일반' }[r] || '일반');
 
 // ---------- 테마 ----------
 function initTheme() {
@@ -27,6 +30,7 @@ function renderThemeBtn() {
 
 // ---------- 레이아웃 ----------
 function renderShell() {
+  const me = getCurrentUser() || { name: '사용자', department: '', role: 'user' };
   const collapsed = localStorage.getItem('mes_collapsed') === '1';
   app.className = 'app' + (collapsed ? ' collapsed' : '');
   app.innerHTML = `
@@ -48,7 +52,9 @@ function renderShell() {
         ${IS_DEMO ? `<span class="badge badge--warning" title="Supabase 미연결 — 브라우저에 임시 저장됩니다">데모 모드</span>` : `<span class="badge badge--success">Supabase 연결됨</span>`}
         <button class="icon-btn" id="theme-btn" title="테마 전환"></button>
         <button class="icon-btn" title="알림">${icon('bell', 19)}</button>
-        <div class="avatar" title="관리자">A</div>
+        <div class="user-menu">
+          <div class="avatar" id="user-avatar" title="${escapeHtml(me ? me.name : '')}">${initial(me?.name)}</div>
+        </div>
       </header>
       <main class="content" id="content"></main>
     </div>
@@ -68,6 +74,7 @@ function renderShell() {
   };
   document.getElementById('scrim').onclick = () => { app.classList.remove('mobile-open'); document.getElementById('scrim').classList.remove('show'); };
   document.getElementById('theme-btn').onclick = toggleTheme;
+  document.getElementById('user-avatar').onclick = (e) => { e.stopPropagation(); toggleUserMenu(); };
   const reset = document.getElementById('reset-demo');
   if (reset) reset.onclick = async () => {
     const ok = await confirmDialog({ title: '데모 데이터 초기화', message: '모든 입력 데이터를 삭제하고 기본 샘플로 되돌립니다. 계속하시겠습니까?', confirmText: '초기화' });
@@ -156,9 +163,103 @@ async function route() {
   window.scrollTo(0, 0);
 }
 
+// ---------- 사용자 메뉴 (아바타 드롭다운) ----------
+function toggleUserMenu() {
+  const wrap = document.querySelector('.user-menu');
+  if (!wrap) return;
+  const existing = wrap.querySelector('.user-pop');
+  if (existing) { existing.remove(); return; }
+  const me = getCurrentUser() || { name: '사용자', department: '', role: 'user', login_id: '' };
+  const pop = document.createElement('div');
+  pop.className = 'user-pop';
+  pop.innerHTML = `
+    <div class="user-pop__head">
+      <div class="avatar">${initial(me.name)}</div>
+      <div><div class="user-pop__name">${escapeHtml(me.name)}</div>
+        <div class="user-pop__sub">${escapeHtml(me.login_id || '')} · ${escapeHtml(me.department || '')} · ${escapeHtml(roleLabel(me.role))}</div></div>
+    </div>
+    <button class="user-pop__item" data-act="pw">${icon('settings', 17)} 비밀번호 변경</button>
+    <button class="user-pop__item danger" data-act="logout">${icon('logout', 17)} 로그아웃</button>`;
+  wrap.appendChild(pop);
+  pop.querySelector('[data-act="pw"]').onclick = () => { pop.remove(); openChangePassword(); };
+  pop.querySelector('[data-act="logout"]').onclick = () => { pop.remove(); doLogout(); };
+  // 바깥 클릭 시 닫기
+  setTimeout(() => document.addEventListener('click', function close(ev) {
+    if (!wrap.contains(ev.target)) { pop.remove(); document.removeEventListener('click', close); }
+  }), 0);
+}
+
+async function doLogout() {
+  const ok = await confirmDialog({ title: '로그아웃', message: '로그아웃 하시겠습니까?', confirmText: '로그아웃', danger: false });
+  if (!ok) return;
+  logout();
+  renderLogin();
+}
+
+function openChangePassword() {
+  const body = document.createElement('form');
+  body.className = 'form-grid';
+  body.innerHTML = `
+    <div class="field col-2"><label>새 비밀번호 <span class="req">*</span></label><input class="input" type="password" name="pw1" autocomplete="new-password"></div>
+    <div class="field col-2"><label>새 비밀번호 확인 <span class="req">*</span></label><input class="input" type="password" name="pw2" autocomplete="new-password"></div>`;
+  openModal({
+    title: '비밀번호 변경', body,
+    footer: `<button class="btn" data-cancel>취소</button><button class="btn btn--primary" data-ok>${icon('check', 16)} 변경</button>`,
+    onMount: ({ footEl, close }) => {
+      footEl.querySelector('[data-cancel]').onclick = close;
+      footEl.querySelector('[data-ok]').onclick = async () => {
+        const pw1 = body.querySelector('[name="pw1"]').value;
+        const pw2 = body.querySelector('[name="pw2"]').value;
+        if (!pw1) { toast('새 비밀번호를 입력하세요.', 'error'); return; }
+        if (pw1 !== pw2) { toast('비밀번호 확인이 일치하지 않습니다.', 'error'); return; }
+        try { await changeMyPassword(pw1); close(); toast('비밀번호가 변경되었습니다.'); }
+        catch (e) { toast(e.message || '변경 실패 (DB에 password 컬럼이 없으면 migration_user_password.sql 실행 필요)', 'error'); }
+      };
+    },
+  });
+}
+
+// ---------- 로그인 화면 ----------
+function renderLogin() {
+  app.className = '';
+  app.innerHTML = `
+    <div class="login-wrap">
+      <form class="login-card" id="login-form">
+        <div class="login-brand">
+          <div class="sidebar__logo">M</div>
+          <b>${escapeHtml(APP_CONFIG.appName)}</b>
+          <span>${escapeHtml(APP_CONFIG.company)} 제조실행시스템</span>
+        </div>
+        <div class="field"><label>아이디</label><input class="input" name="login_id" autocomplete="username" placeholder="로그인 아이디" autofocus></div>
+        <div class="field"><label>비밀번호</label><input class="input" type="password" name="password" autocomplete="current-password" placeholder="비밀번호"></div>
+        <div class="login-err" id="login-err"></div>
+        <button class="btn btn--primary" type="submit">${icon('logout', 16)} 로그인</button>
+        ${IS_DEMO ? `<div class="login-hint">데모 계정: <b>admin / admin</b><br/>(prod01·qa01·mat01·sales01 / 1234)</div>` : ''}
+      </form>
+    </div>`;
+  const form = document.getElementById('login-form');
+  const err = document.getElementById('login-err');
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    err.textContent = '';
+    const btn = form.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    try {
+      await login(form.login_id.value, form.password.value);
+      startApp();
+    } catch (ex) { err.textContent = ex.message || '로그인 실패'; btn.disabled = false; }
+  };
+}
+
 // ---------- 시작 ----------
+let started = false;
+function startApp() {
+  renderShell();
+  if (!started) { window.addEventListener('hashchange', route); started = true; }
+  if (!location.hash) location.replace('#' + DEFAULT_ROUTE);
+  route();
+}
+
 initTheme();
-renderShell();
-window.addEventListener('hashchange', route);
-if (!location.hash) location.replace('#' + DEFAULT_ROUTE);
-route();
+if (getCurrentUser()) startApp();
+else renderLogin();
