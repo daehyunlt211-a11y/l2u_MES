@@ -1,0 +1,5 @@
+# Cloudflare Pages 설정 (Wrangler CLI 또는 Git 연동 시 사용)
+# 빌드 과정이 없는 정적 사이트이므로 출력 디렉터리는 프로젝트 루트(".")
+name = "linktours-mes"
+pages_build_output_dir = "."
+compatibility_date = "2024-12-01"

@@ -1,0 +1,12 @@
+# 로컬 개발/도구
+.claude/
+.wrangler/
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 로그
+*.log

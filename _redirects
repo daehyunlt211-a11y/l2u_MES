@@ -1,0 +1,4 @@
+# Cloudflare Pages / Netlify 공통 — SPA 안전망
+# 실제 파일(js, css, html 등)이 있으면 그 파일이 우선 서빙되고,
+# 매칭되는 파일이 없을 때만 index.html 로 200 반환(해시 라우팅 직접 접근 대비)
+/*    /index.html    200
