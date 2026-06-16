@@ -109,13 +109,17 @@ export const nonconformances = createCrudPage({
   ],
   statusChips: { key: 'status', options: ['처리중', '완료'] },
   docNoField: { key: 'ncr_no', prefix: 'NC' },
-  rowActions: [
+  // 리스트 우측상단 단일 버튼 + 행 다중선택(체크박스)으로 일괄 처리완료
+  bulkActions: [
     {
-      label: '처리완료', icon: 'checkCircle', cls: 'btn--primary', title: '처리완료(상태→완료)',
-      show: (r) => r.status === '처리중',
-      onClick: async (r, reload) => {
-        try { await db.update('nonconformances', r.id, { status: '완료' }); toast(`${r.ncr_no} 처리완료 되었습니다.`); reload(); }
-        catch (e) { toast(e.message || '처리 실패', 'error'); }
+      label: '처리완료', icon: 'checkCircle', cls: 'btn--primary',
+      onClick: async (selected, reload) => {
+        const targets = selected.filter(r => r.status === '처리중');
+        if (!targets.length) { toast('처리중 상태인 항목을 선택하세요.', 'error'); return; }
+        try {
+          for (const r of targets) await db.update('nonconformances', r.id, { status: '완료' });
+          toast(`${targets.length}건 처리완료 되었습니다.`); reload();
+        } catch (e) { toast(e.message || '처리 실패', 'error'); }
       },
     },
   ],

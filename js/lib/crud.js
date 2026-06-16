@@ -15,7 +15,9 @@ export function createCrudPage(cfg) {
       sortDir: cfg.defaultSort?.dir || 'asc',
       filters: {},
       chip: '__all__',
+      selected: new Set(),
     };
+    let pageRows = []; // 현재 페이지 행 (일괄작업 매핑용)
 
     root.innerHTML = `
       <div class="page-head">
@@ -36,13 +38,30 @@ export function createCrudPage(cfg) {
 
     // ----- 상단 액션 버튼 -----
     const actions = root.querySelector('#ph-actions');
+    const bulkActions = cfg.bulkActions || [];
     actions.innerHTML = `
+      ${bulkActions.map((a, i) => `<button class="btn ${a.cls || ''}" data-bulk="${i}" disabled>${a.icon ? icon(a.icon, 16) : ''} ${escapeHtml(a.label)} <span data-bulk-count></span></button>`).join('')}
       <button class="btn" id="btn-csv">${icon('download', 16)} 엑셀(CSV)</button>
       <button class="btn" id="btn-refresh">${icon('refresh', 16)} 새로고침</button>
       ${cfg.readOnly ? '' : `<button class="btn btn--primary" id="btn-add">${icon('plus', 16)} 신규등록</button>`}`;
     root.querySelector('#btn-refresh').onclick = () => load();
     root.querySelector('#btn-csv').onclick = () => exportCsv();
     if (!cfg.readOnly) root.querySelector('#btn-add').onclick = () => openForm(null);
+    actions.querySelectorAll('[data-bulk]').forEach(btn => btn.onclick = async () => {
+      const a = bulkActions[+btn.dataset.bulk];
+      const sel = pageRows.filter(r => state.selected.has(r.id));
+      if (!sel.length) return;
+      await a.onClick(sel, load);
+    });
+
+    function updateBulk() {
+      const n = state.selected.size;
+      actions.querySelectorAll('[data-bulk]').forEach(btn => {
+        btn.disabled = n === 0;
+        const c = btn.querySelector('[data-bulk-count]');
+        if (c) c.textContent = n ? `(${n})` : '';
+      });
+    }
 
     // ----- 툴바: 검색 + 필터 -----
     const toolbar = root.querySelector('#toolbar');
@@ -88,8 +107,10 @@ export function createCrudPage(cfg) {
       try {
         const opts = { search: state.search, searchFields: cfg.searchFields, filters: { ...state.filters }, sort: state.sort, sortDir: state.sortDir, page: state.page, pageSize: state.pageSize };
         const { rows, total } = await db.list(cfg.table, opts);
+        state.selected.clear();
         renderTable(rows);
         renderPager(total);
+        if (cfg.bulkActions) updateBulk();
         if (cfg.stats) renderStats();
         if (cfg.statusChips) updateChipCounts();
         if (cfg.banner) { try { await cfg.banner(root.querySelector('#banner-slot'), load); } catch { /* noop */ } }
@@ -126,12 +147,14 @@ export function createCrudPage(cfg) {
     }
 
     function renderTable(rows) {
+      pageRows = rows;
       if (!rows.length) {
         tableSlot.innerHTML = `<div class="empty">${icon('inbox', 52)}<h4>데이터가 없습니다</h4><p>${cfg.readOnly ? '표시할 항목이 없습니다.' : '신규등록 버튼으로 항목을 추가하세요.'}</p></div>`;
         return;
       }
       const cols = cfg.columns;
-      const thead = cols.map(c => {
+      const selCol = cfg.bulkActions ? `<th class="center" style="width:40px"><input type="checkbox" class="checkbox" id="sel-all"></th>` : '';
+      const thead = selCol + cols.map(c => {
         const align = c.align === 'right' || c.type === 'num' || c.type === 'money' ? 'num' : c.align === 'center' ? 'center' : '';
         const sortable = c.sortable ? 'sortable' : '';
         const sorted = state.sort === c.key ? 'sorted' : '';
@@ -141,6 +164,7 @@ export function createCrudPage(cfg) {
 
       const rowActs = cfg.rowActions || [];
       const tbody = rows.map(r => {
+        const selCell = cfg.bulkActions ? `<td class="center"><input type="checkbox" class="checkbox" data-select="${r.id}"></td>` : '';
         const tds = cols.map(c => {
           const align = c.align === 'right' || c.type === 'num' || c.type === 'money' ? 'num' : c.align === 'center' ? 'center' : '';
           return `<td class="${align} ${c.cls || ''}">${cellValue(c, r)}</td>`;
@@ -152,7 +176,7 @@ export function createCrudPage(cfg) {
             <button class="icon-btn" data-edit="${r.id}" title="수정">${icon('edit', 15)}</button>
             <button class="icon-btn" data-del="${r.id}" title="삭제">${icon('trash', 15)}</button>
           </div></td>`;
-        return `<tr data-id="${r.id}">${tds}${act}</tr>`;
+        return `<tr data-id="${r.id}">${selCell}${tds}${act}</tr>`;
       }).join('');
 
       tableSlot.innerHTML = `<table class="grid"><thead><tr>${thead}</tr></thead><tbody>${tbody}</tbody></table>`;
@@ -163,6 +187,15 @@ export function createCrudPage(cfg) {
         else { state.sort = k; state.sortDir = 'asc'; }
         load();
       });
+
+      // 행 선택(다중) — 일괄 작업용
+      if (cfg.bulkActions) {
+        const selAll = tableSlot.querySelector('#sel-all');
+        const boxes = [...tableSlot.querySelectorAll('[data-select]')];
+        const syncAll = () => { selAll.checked = boxes.length > 0 && boxes.every(b => b.checked); selAll.indeterminate = !selAll.checked && boxes.some(b => b.checked); };
+        selAll.onchange = () => { boxes.forEach(b => { b.checked = selAll.checked; b.checked ? state.selected.add(b.dataset.select) : state.selected.delete(b.dataset.select); }); updateBulk(); };
+        boxes.forEach(b => b.onchange = () => { b.checked ? state.selected.add(b.dataset.select) : state.selected.delete(b.dataset.select); syncAll(); updateBulk(); });
+      }
       if (!cfg.readOnly) {
         tableSlot.querySelectorAll('[data-rowact]').forEach(b => b.onclick = async () => {
           const row = rows.find(r => r.id === b.dataset.id);
