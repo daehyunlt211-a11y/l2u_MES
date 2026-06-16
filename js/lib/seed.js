@@ -5,6 +5,37 @@ const d = (offset = 0) => {
   return x.toISOString().slice(0, 10);
 };
 
+// 부적합 샘플 데이터 생성 (최근 30일, 다양한 공정/작업자/조치/불량유형)
+const NCR_SAMPLES = (() => {
+  const procs = ['CNC 황삭', 'CNC 정삭', '조립', '검사', '포장'];
+  const workers = ['박생산', '최품질', '정자재', '이영업'];
+  const actions = ['폐기', '재작업', '특채', '반품'];
+  const defects = ['치수불량', '외관불량', '가공불량', '조립불량', '도장불량'];
+  const items = [['P-1001', '브라켓 ASSY'], ['P-1002', '커버 하우징'], ['S-2001', '가공 브라켓']];
+  const causes = ['공구마모', '셋업오류', '소재불량', '작업자 실수', '설비 이상'];
+  const rows = [];
+  // 28일에 걸쳐 24건
+  const offsets = [-28, -26, -25, -23, -21, -20, -18, -17, -15, -14, -13, -11, -10, -9, -8, -7, -6, -5, -4, -3, -3, -2, -1, 0];
+  offsets.forEach((off, i) => {
+    const it = items[i % items.length];
+    const qty = ((i * 7) % 28) + 2;
+    rows.push({
+      ncr_no: `NC-S-${String(i + 1).padStart(3, '0')}`,
+      occur_date: d(off),
+      process: procs[i % procs.length],
+      item_code: it[0], item_name: it[1],
+      defect_type: defects[i % defects.length],
+      defect_qty: qty,
+      cause: causes[i % causes.length],
+      action: '조치 진행',
+      action_type: actions[i % actions.length],
+      worker: workers[i % workers.length],
+      status: i % 3 === 0 ? '처리중' : '완료',
+    });
+  });
+  return rows;
+})();
+
 export const SEED = {
   departments: [
     { code: 'D100', name: '경영지원팀', manager: '김대표', phone: '02-1000-1000', use_yn: true },
@@ -120,6 +151,7 @@ export const SEED = {
   ],
   nonconformances: [
     { ncr_no: 'NC-2406-001', occur_date: d(-2), process: 'CNC 황삭', item_code: 'P-1001', item_name: '브라켓 ASSY', defect_type: '치수불량', defect_qty: 10, cause: '공구마모', action: '공구교체 후 재작업', action_type: '재작업', worker: '박생산', status: '완료' },
+    ...NCR_SAMPLES,
   ],
   shipping_inspections: [
     { inspect_no: 'SI-2406-001', inspect_date: d(-2), order_no: 'SO-2406-001', partner: '(주)현대정밀', item_code: 'P-1001', item_name: '브라켓 ASSY', inspect_qty: 200, good_qty: 200, defect_qty: 0, inspector: '최품질', result: '합격' },
