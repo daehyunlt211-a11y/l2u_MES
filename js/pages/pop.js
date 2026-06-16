@@ -126,9 +126,8 @@ export async function popDetail(root, params = {}) {
     const progPct = procs.length ? Math.round(doneCnt / procs.length * 100) : 0;
 
     root.innerHTML = `
-      <div class="flex between" style="margin-bottom:16px">
+      <div style="margin-bottom:16px">
         <button class="btn" id="pop-back">${icon('chevronLeft', 16)} 작업지시 목록</button>
-        <button class="btn btn--danger" id="pop-ncr">${icon('alert', 16)} 부적합 등록</button>
       </div>
       <div class="pop-detail-head">
         <div>
@@ -145,11 +144,10 @@ export async function popDetail(root, params = {}) {
       <div class="progress" style="height:10px;margin-bottom:18px"><span style="width:${progPct}%"></span></div>
       <div id="proc-list"></div>`;
     bindBack(root);
-    root.querySelector('#pop-ncr').onclick = () => openNcr();
     renderProcs();
   }
 
-  // 부적합 등록 (부적합관리와 동일한 팝업), 작업지시 정보 프리필
+  // 부적합 등록 (부적합관리와 동일한 팝업) — 종료한 공정과 연계해 프리필
   function openNcr(proc) {
     openNonconformanceForm({
       prefill: {
@@ -273,12 +271,13 @@ export async function popDetail(root, params = {}) {
             await createResult(p, good, defect, workTime);
             await syncWoStatus();
             close();
-            toast(`[${p.process_name}] 종료 — 생산실적이 등록되었습니다.`);
             render();
-            // 불량 발생 시 부적합 등록 팝업(부적합관리와 동일) 자동 안내
+            // 불량 발생 시 해당 공정과 연계한 부적합 등록 진행
             if (defect > 0) {
-              const ok = await confirmDialog({ title: '부적합 등록', message: `불량 ${num(defect)}EA 가 발생했습니다. 부적합 등록을 진행하시겠습니까?`, confirmText: '부적합 등록', danger: false });
-              if (ok) openNcr({ ...p, defect_qty: defect });
+              toast(`[${p.process_name}] 불량 ${num(defect)}EA — 부적합 등록을 진행합니다.`, 'info');
+              openNcr({ ...p, defect_qty: defect });
+            } else {
+              toast(`[${p.process_name}] 종료 — 생산실적이 등록되었습니다.`);
             }
           } catch (e) { toast(e.message || '종료 실패', 'error'); }
         };

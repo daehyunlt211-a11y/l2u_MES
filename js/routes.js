@@ -12,6 +12,7 @@ import { processMaster } from './pages/processMaster.js';
 import { incomingInspection, shippingInspection } from './pages/inspection.js';
 import { departmentManager } from './pages/department.js';
 import { inspectionStandards } from './pages/inspectionStandard.js';
+import { ncrStatus } from './pages/ncrStatus.js';
 
 // 사이드바 메뉴 트리 (group icon + 하위 항목)
 export const MENU = [
@@ -62,6 +63,7 @@ export const MENU = [
       { label: '검사기준관리', path: '/quality/standards' },
       { label: '수입검사', path: '/quality/incoming' },
       { label: '부적합관리', path: '/quality/nonconformance' },
+      { label: '부적합현황', path: '/quality/ncr-status' },
       { label: '출하검사', path: '/quality/shipping' },
     ],
   },
@@ -102,6 +104,7 @@ export const ROUTES = {
   '/quality/standards': { render: inspectionStandards, title: '검사기준관리', group: '품질관리' },
   '/quality/incoming': { render: incomingInspection, title: '수입검사', group: '품질관리' },
   '/quality/nonconformance': { render: qa.nonconformances, title: '부적합관리', group: '품질관리' },
+  '/quality/ncr-status': { render: ncrStatus, title: '부적합현황', group: '품질관리' },
   '/quality/shipping': { render: shippingInspection, title: '출하검사', group: '품질관리' },
 };
 

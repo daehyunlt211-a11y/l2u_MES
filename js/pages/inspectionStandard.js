@@ -4,7 +4,7 @@ import { escapeHtml, nextDocNo } from '../lib/format.js';
 import { toast, confirmDialog, openModal, badge, yesNo } from '../ui/components.js';
 import { icon } from '../ui/icons.js';
 
-const TYPES = ['수입검사', '부적합검사', '출하검사'];
+const TYPES = ['수입검사', '출하검사'];
 
 export async function inspectionStandards(root) {
   const state = { type: '수입검사', search: '', rows: [], counts: {}, items: [], tools: [] };

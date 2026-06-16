@@ -114,7 +114,6 @@ export const SEED = {
     { std_no: 'IS-002', item_code: 'P-1001', item_name: '브라켓 ASSY', inspect_type: '출하검사', eval_method: '정성적', inspect_item: '외관/도장', spec_value: '스크래치·이물 없음', tolerance: '', method: '육안', equipment: '', use_yn: true },
     { std_no: 'IS-003', item_code: 'M-3001', item_name: 'AL 6061 판재', inspect_type: '수입검사', eval_method: '정량적', inspect_item: '두께', spec_value: '15', tolerance: '0.05', method: '마이크로미터', equipment: '마이크로미터', use_yn: true },
     { std_no: 'IS-004', item_code: 'M-3001', item_name: 'AL 6061 판재', inspect_type: '수입검사', eval_method: '정성적', inspect_item: '표면상태', spec_value: '흠집 없음', tolerance: '', method: '육안', equipment: '', use_yn: true },
-    { std_no: 'IS-005', item_code: 'P-1001', item_name: '브라켓 ASSY', inspect_type: '부적합검사', eval_method: '정성적', inspect_item: '치수 외관', spec_value: '불량 없음', tolerance: '', method: '육안', equipment: '', use_yn: true },
   ],
   incoming_inspections: [
     { inspect_no: 'II-2406-001', inspect_date: d(-6), inbound_no: 'MI-2406-001', partner: '대성머티리얼', item_code: 'M-3001', item_name: 'AL 6061 판재', lot_no: 'LOT-A001', inspect_qty: 100, good_qty: 98, defect_qty: 2, inspector: '최품질', result: '합격' },
