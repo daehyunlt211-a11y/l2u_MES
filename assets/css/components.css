@@ -400,6 +400,21 @@ table.grid td.center, table.grid th.center { text-align: center; }
 .user-pop__item.danger { color: var(--danger); }
 .user-pop__item.danger svg { color: var(--danger); }
 
+/* 차트 인터랙션 (부적합현황) */
+.chart-tip {
+  position: fixed; z-index: 300; display: none; pointer-events: none;
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: 10px; box-shadow: var(--shadow-lg);
+  padding: 9px 12px; font-size: 12.5px; max-width: 240px;
+}
+.chart-tip b { font-size: 13px; }
+.donut-seg { cursor: pointer; transition: opacity 0.15s; }
+.donut-seg:hover { opacity: 0.72; }
+.ncr-legend-item { cursor: pointer; border-radius: 7px; transition: background var(--transition); }
+.ncr-legend-item:hover { background: var(--surface-2); }
+.trend-bar { cursor: pointer; }
+.trend-bar:hover > div > div { filter: brightness(1.12); }
+
 /* 라우팅(제품별표준공정) 좌측 품목 리스트 */
 .rt-item { transition: background var(--transition); }
 .rt-item:hover { background: var(--surface-2); }

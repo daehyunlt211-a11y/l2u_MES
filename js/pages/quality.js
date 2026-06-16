@@ -1,7 +1,8 @@
 // 품질관리: 검사기준 / 수입검사 / 부적합 / 출하검사
 import { createCrudPage } from '../lib/crud.js';
+import { db } from '../lib/db.js';
 import { num, todayStr } from '../lib/format.js';
-import { badge } from '../ui/components.js';
+import { badge, toast } from '../ui/components.js';
 
 // 합격/불합격 양품률 자동 결과 보조
 function rateBadge(r) {
@@ -108,6 +109,16 @@ export const nonconformances = createCrudPage({
   ],
   statusChips: { key: 'status', options: ['처리중', '완료'] },
   docNoField: { key: 'ncr_no', prefix: 'NC' },
+  rowActions: [
+    {
+      label: '처리완료', icon: 'checkCircle', cls: 'btn--primary', title: '처리완료(상태→완료)',
+      show: (r) => r.status === '처리중',
+      onClick: async (r, reload) => {
+        try { await db.update('nonconformances', r.id, { status: '완료' }); toast(`${r.ncr_no} 처리완료 되었습니다.`); reload(); }
+        catch (e) { toast(e.message || '처리 실패', 'error'); }
+      },
+    },
+  ],
   stats: async (rows) => [
     { label: '총 부적합', value: num(rows.length), unit: '건', icon: 'alert', tint: 'brand' },
     { label: '처리중', value: num(rows.filter(r => r.status === '처리중').length), unit: '건', icon: 'clock', tint: 'amber' },
