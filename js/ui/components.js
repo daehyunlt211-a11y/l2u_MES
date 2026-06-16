@@ -15,8 +15,9 @@ export function toast(msg, type = 'success') {
 }
 
 // ---------- Modal ----------
-// openModal({ title, body(html|node), footer(html|node), wide, onMount })
-export function openModal({ title, body, footer, wide = false, onMount }) {
+// openModal({ title, body(html|node), footer(html|node), wide, onMount, dismissible })
+//  dismissible=false 이면 X·바깥클릭·ESC로 닫히지 않음(저장/확정해야 close 호출 시에만 닫힘)
+export function openModal({ title, body, footer, wide = false, onMount, dismissible = true }) {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
@@ -24,7 +25,7 @@ export function openModal({ title, body, footer, wide = false, onMount }) {
       <div class="modal__head">
         <h3>${escapeHtml(title)}</h3>
         <div class="spacer"></div>
-        <button class="icon-btn" data-close>${icon('x', 19)}</button>
+        ${dismissible ? `<button class="icon-btn" data-close>${icon('x', 19)}</button>` : ''}
       </div>
       <div class="modal__body"></div>
       <div class="modal__foot"></div>
@@ -37,10 +38,12 @@ export function openModal({ title, body, footer, wide = false, onMount }) {
   else footEl.remove();
 
   const close = () => { overlay.style.animation = 'fadeIn 140ms reverse'; modal.style.opacity = '0'; setTimeout(() => overlay.remove(), 130); document.removeEventListener('keydown', onKey); };
-  const onKey = (e) => { if (e.key === 'Escape') close(); };
-  overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(); });
-  overlay.querySelector('[data-close]').addEventListener('click', close);
-  document.addEventListener('keydown', onKey);
+  const onKey = (e) => { if (e.key === 'Escape' && dismissible) close(); };
+  if (dismissible) {
+    overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(); });
+    overlay.querySelector('[data-close]')?.addEventListener('click', close);
+    document.addEventListener('keydown', onKey);
+  }
   document.body.appendChild(overlay);
   onMount?.({ overlay, bodyEl, footEl, close });
   return { overlay, bodyEl, footEl, close };

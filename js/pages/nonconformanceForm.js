@@ -8,8 +8,10 @@ import { icon } from '../ui/icons.js';
 const ACTION_TYPES = ['폐기', '재작업', '특채', '반품'];
 const STATUSES = ['처리중', '완료'];
 
-// openNonconformanceForm({ prefill, onSaved })
-export async function openNonconformanceForm({ prefill = {}, onSaved } = {}) {
+// openNonconformanceForm({ prefill, onSaved, mandatory, lockProcess })
+//  mandatory=true: 등록하지 않으면 닫을 수 없음(취소/X/바깥클릭/ESC 불가)
+//  lockProcess=true: 발생공정을 prefill 값으로 고정(수정 불가)
+export async function openNonconformanceForm({ prefill = {}, onSaved, mandatory = false, lockProcess = false } = {}) {
   const [processes, items, users] = await Promise.all([
     db.all('processes', { sort: 'code' }).catch(() => []),
     db.all('items', { sort: 'code' }).catch(() => []),
@@ -22,10 +24,12 @@ export async function openNonconformanceForm({ prefill = {}, onSaved } = {}) {
   body.innerHTML = `
     <div class="field"><label>부적합번호</label><input class="input" name="ncr_no" value="" placeholder="저장 시 자동 채번" readonly></div>
     <div class="field"><label>발생일 <span class="req">*</span></label><input class="input" name="occur_date" type="date" value="${escapeHtml(p.occur_date || todayStr())}"></div>
-    <div class="field"><label>발생공정</label>
-      <select class="select" name="process"><option value="">선택</option>
+    <div class="field"><label>발생공정${lockProcess ? ' <span class="muted">(공정 고정)</span>' : ''}</label>
+      ${lockProcess
+      ? `<input class="input" name="process" value="${escapeHtml(p.process || '')}" readonly>`
+      : `<select class="select" name="process"><option value="">선택</option>
         ${processes.map(x => `<option value="${escapeHtml(x.name)}" ${p.process === x.name ? 'selected' : ''}>${escapeHtml(x.code)} · ${escapeHtml(x.name)}</option>`).join('')}
-      </select></div>
+      </select>`}</div>
     <div class="field"><label>품목</label>
       <select class="select" name="item_code"><option value="">선택</option>
         ${items.map(x => `<option value="${escapeHtml(x.code)}" ${p.item_code === x.code ? 'selected' : ''}>${escapeHtml(x.code)} · ${escapeHtml(x.name)}</option>`).join('')}
@@ -49,10 +53,10 @@ export async function openNonconformanceForm({ prefill = {}, onSaved } = {}) {
   });
 
   openModal({
-    title: '부적합 등록', body, wide: true,
-    footer: `<button class="btn" data-cancel>취소</button><button class="btn btn--primary" data-ok>${icon('check', 16)} 등록</button>`,
+    title: mandatory ? '부적합 등록 (필수)' : '부적합 등록', body, wide: true, dismissible: !mandatory,
+    footer: `${mandatory ? '<span class="muted" style="margin-right:auto">불량이 발생하여 부적합 등록이 필요합니다.</span>' : '<button class="btn" data-cancel>취소</button>'}<button class="btn btn--primary" data-ok>${icon('check', 16)} 등록</button>`,
     onMount: ({ footEl, close }) => {
-      footEl.querySelector('[data-cancel]').onclick = close;
+      footEl.querySelector('[data-cancel]')?.addEventListener('click', close);
       footEl.querySelector('[data-ok]').onclick = async () => {
         const g = (n) => { const el = body.querySelector(`[name="${n}"]`); return el ? el.value.trim() : ''; };
         if (!g('item_name')) { toast('품목(품명)을 선택하세요.', 'error'); return; }

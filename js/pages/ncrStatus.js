@@ -112,25 +112,51 @@ function agg(rows, key) {
   return Object.entries(m).map(([label, v]) => ({ label, ...v })).sort((a, b) => b.qty - a.qty || b.count - a.count);
 }
 
-// ---------- 발생일별 추이 (세로 막대) ----------
+// ---------- 발생일별 추이 (세로 막대 + X·Y축) ----------
+function niceMax(v) {
+  if (v <= 0) return 5;
+  const pow = Math.pow(10, Math.floor(Math.log10(v)));
+  const step = pow / 2 || 1;
+  return Math.ceil(v / step) * step;
+}
 function trendChart(rows, from, to) {
   const days = [];
   let d = new Date(from); const end = new Date(to);
   while (d <= end && days.length < 120) { days.push(fmt(d)); d = new Date(d.getTime() + 86400000); }
   const map = {};
   for (const r of rows) { const k = String(r.occur_date || '').slice(0, 10); map[k] = (map[k] || 0) + (+r.defect_qty || 0); }
-  const max = Math.max(1, ...days.map(x => map[x] || 0));
-  const labelEvery = Math.ceil(days.length / 10);
-  const bars = days.map((x, i) => {
+  const rawMax = Math.max(1, ...days.map(x => map[x] || 0));
+  const max = niceMax(rawMax);
+  const PLOT = 180;
+  const labelEvery = Math.ceil(days.length / 12);
+
+  // Y축 눈금 (위→아래: max ... 0)
+  const yTicks = [1, 0.75, 0.5, 0.25, 0].map(f => `<div style="line-height:1">${num(Math.round(max * f))}</div>`).join('');
+  // 가로 그리드라인
+  const grid = [0, 0.25, 0.5, 0.75, 1].map(f => `<div style="position:absolute;left:0;right:0;bottom:${(f * 100).toFixed(2)}%;border-top:1px ${f === 0 ? 'solid' : 'dashed'} var(--border)"></div>`).join('');
+  // 막대
+  const bars = days.map(x => {
     const v = map[x] || 0;
-    const h = Math.round(v / max * 100);
-    const lab = (i % labelEvery === 0) ? `<div style="font-size:10px;color:var(--text-3);transform:rotate(-45deg);transform-origin:top left;white-space:nowrap;height:14px">${x.slice(5)}</div>` : `<div style="height:14px"></div>`;
-    return `<div class="trend-bar" data-date="${x}" style="flex:1;min-width:6px;display:flex;flex-direction:column;align-items:center;gap:4px">
-      <div style="width:100%;height:150px;display:flex;align-items:flex-end">
-        <div style="width:72%;margin:0 auto;height:${h}%;min-height:${v ? 4 : 0}px;background:linear-gradient(180deg,var(--brand-400),var(--brand-600));border-radius:4px 4px 0 0"></div>
-      </div>${lab}</div>`;
+    const h = v / max * 100;
+    return `<div class="trend-bar" data-date="${x}" title="${x} · ${num(v)} EA" style="flex:1;min-width:5px;height:100%;display:flex;align-items:flex-end">
+      <div style="width:70%;margin:0 auto;height:${h.toFixed(2)}%;min-height:${v ? 3 : 0}px;background:linear-gradient(180deg,var(--brand-400),var(--brand-600));border-radius:3px 3px 0 0"></div>
+    </div>`;
   }).join('');
-  return `<div style="display:flex;align-items:flex-end;gap:3px;overflow-x:auto;padding-bottom:4px">${bars}</div>`;
+  // X축 라벨
+  const xLabels = days.map((x, i) => `<div style="flex:1;min-width:5px;text-align:center;font-size:9.5px;color:var(--text-3);white-space:nowrap;overflow:hidden">${i % labelEvery === 0 ? x.slice(5) : ''}</div>`).join('');
+
+  return `
+    <div style="display:flex;gap:8px;align-items:stretch">
+      <div style="width:38px;height:${PLOT}px;display:flex;flex-direction:column;justify-content:space-between;text-align:right;font-size:10px;color:var(--text-3);padding-bottom:1px">${yTicks}</div>
+      <div style="flex:1;min-width:0">
+        <div style="position:relative;height:${PLOT}px">
+          ${grid}
+          <div style="position:absolute;inset:0;display:flex;align-items:flex-end;gap:3px">${bars}</div>
+        </div>
+        <div style="display:flex;gap:3px;margin-top:5px">${xLabels}</div>
+        <div style="text-align:center;font-size:11px;color:var(--text-3);margin-top:6px">발생일 (단위: 부적합수량 EA)</div>
+      </div>
+    </div>`;
 }
 
 // ---------- 도넛 차트 (SVG 세그먼트) + 범례 ----------

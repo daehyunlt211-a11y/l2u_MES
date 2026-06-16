@@ -147,9 +147,10 @@ export async function popDetail(root, params = {}) {
     renderProcs();
   }
 
-  // 부적합 등록 (부적합관리와 동일한 팝업) — 종료한 공정과 연계해 프리필
+  // 부적합 등록 (부적합관리와 동일한 팝업) — 종료한 공정으로 고정, 등록 전 닫기 불가
   function openNcr(proc) {
     openNonconformanceForm({
+      mandatory: true, lockProcess: true,
       prefill: {
         occur_date: todayStr(), process: proc?.process_name || '', item_code: wo.item_code, item_name: wo.item_name,
         defect_qty: proc?.defect_qty || 0, worker: proc?.worker || getWorker(), status: '처리중',
