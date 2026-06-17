@@ -89,6 +89,15 @@ insert into process_equipments (process_code, equipment_code, equipment_name) va
   ('OP50','PKG-01','자동포장기')
 on conflict do nothing;
 
+-- ---------- 1-9 BOM ----------
+insert into boms (item_code, component_code, component_name, qty, unit) values
+  ('P-1001','S-2001','가공 브라켓',1,'EA'),
+  ('P-1001','M-4001','볼트 M6x20',4,'EA'),
+  ('P-1002','M-3001','AL 6061 판재',1,'EA'),
+  ('P-1002','M-4001','볼트 M6x20',6,'EA'),
+  ('S-2001','M-3001','AL 6061 판재',1,'EA')
+on conflict (item_code, component_code) do nothing;
+
 -- ---------- 2-1 수주 (5) ----------
 insert into sales_orders (order_no, order_date, partner, item_code, item_name, spec, unit, order_qty, unit_price, amount, due_date, status) values
   ('SO-2406-001', current_date-5, '(주)현대정밀','P-1001','브라켓 ASSY','120x80x15','EA',500,12000,6000000, current_date+10,'생산중'),

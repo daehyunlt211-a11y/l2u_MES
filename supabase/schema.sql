@@ -151,6 +151,21 @@ create table if not exists equipments (
   updated_at    timestamptz default now()
 );
 
+-- 1-9 BOM관리 (모품목 ↔ 구성품/소요량)
+create table if not exists boms (
+  id              uuid primary key default uuid_generate_v4(),
+  item_code       text not null,                  -- 모품목(완제품/반제품)
+  component_code  text not null,                  -- 구성품(자재/반제품)
+  component_name  text,
+  qty             numeric default 0,              -- 소요량(모품목 1개당)
+  unit            text default 'EA',
+  remark          text,
+  created_at      timestamptz default now(),
+  updated_at      timestamptz default now(),
+  unique (item_code, component_code)
+);
+create index if not exists idx_bom_item on boms(item_code);
+
 -- 1-5b 공정별 사용설비 (표준공정 ↔ 설비 N:M)
 create table if not exists process_equipments (
   id              uuid primary key default uuid_generate_v4(),
@@ -513,7 +528,7 @@ begin
       'work_orders','production_results','material_inbounds','material_outbounds',
       'tool_movements','tool_disposals','inspection_standards','incoming_inspections',
       'nonconformances','shipping_inspections','work_order_processes','process_equipments',
-      'inspection_details'
+      'inspection_details','boms'
     ])
   loop
     execute format('drop trigger if exists trg_%I_updated on %I;', t, t);
@@ -534,7 +549,7 @@ begin
       'work_orders','production_results','material_inbounds','material_outbounds',
       'tool_movements','tool_disposals','inspection_standards','incoming_inspections',
       'nonconformances','shipping_inspections','work_order_processes','process_equipments',
-      'inspection_details'
+      'inspection_details','boms'
     ])
   loop
     execute format('alter table %I enable row level security;', t);

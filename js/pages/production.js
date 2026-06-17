@@ -60,7 +60,6 @@ export const productionPlans = createCrudPage({
     { key: 'plan_qty', label: '계획수량', type: 'num', sortable: true },
     { key: 'start_date', label: '시작일', type: 'date' },
     { key: 'end_date', label: '종료일', type: 'date' },
-    { key: 'line', label: '생산라인' },
     { key: 'status', label: '상태', type: 'badge', align: 'center' },
   ],
   fields: [
@@ -72,7 +71,6 @@ export const productionPlans = createCrudPage({
     { key: 'plan_qty', label: '계획수량', type: 'number', required: true, default: 0 },
     { key: 'start_date', label: '시작일', type: 'date' },
     { key: 'end_date', label: '종료일', type: 'date' },
-    { key: 'line', label: '생산라인', type: 'select', options: ['가공1라인', '가공2라인', '조립라인', '포장라인'], placeholder: '선택' },
     { key: 'status', label: '상태', type: 'select', options: ['계획', '진행', '완료', '보류'], default: '계획' },
     { key: 'remark', label: '비고', type: 'textarea' },
   ],
@@ -285,8 +283,7 @@ async function openPlanModal(order, reload) {
     <div class="field"><label>생산계획일 <span class="req">*</span></label><input class="input" name="plan_date" type="date" value="${todayStr()}"></div>
     <div class="field"><label>계획수량</label><input class="input" name="plan_qty" type="number" value="${escapeHtml(order.order_qty ?? 0)}"></div>
     <div class="field"><label>생산 시작일</label><input class="input" name="start_date" type="date" value="${todayStr()}"></div>
-    <div class="field"><label>생산 종료일</label><input class="input" name="end_date" type="date"></div>
-    <div class="field col-2"><label>생산라인</label><select class="select" name="line"><option value="">선택</option>${['가공1라인', '가공2라인', '조립라인', '포장라인'].map(l => `<option>${l}</option>`).join('')}</select></div>`;
+    <div class="field"><label>생산 종료일</label><input class="input" name="end_date" type="date"></div>`;
   openModal({
     title: '생산계획 생성', body,
     footer: `<button class="btn" data-cancel>취소</button><button class="btn btn--primary" data-ok>${icon('check', 16)} 계획 생성</button>`,
@@ -301,7 +298,7 @@ async function openPlanModal(order, reload) {
           await db.insert('production_plans', {
             plan_no, plan_date: g('plan_date'), order_no: order.order_no, item_code: order.item_code, item_name: order.item_name,
             plan_qty: Number(g('plan_qty')) || order.order_qty || 0, start_date: g('start_date') || null, end_date: g('end_date') || null,
-            line: g('line'), status: '계획',
+            status: '계획',
           });
           await db.update('sales_orders', order.id, { status: '생산중' });
           close(); toast(`생산계획(${plan_no})이 생성되었습니다.`); reload();

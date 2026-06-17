@@ -13,6 +13,7 @@ import { incomingInspection, shippingInspection } from './pages/inspection.js';
 import { departmentManager } from './pages/department.js';
 import { inspectionStandards } from './pages/inspectionStandard.js';
 import { ncrStatus } from './pages/ncrStatus.js';
+import { bomManager } from './pages/bom.js';
 
 // 사이드바 메뉴 트리 (group icon + 하위 항목)
 export const MENU = [
@@ -26,6 +27,7 @@ export const MENU = [
       { label: '품목관리', path: '/base/items' },
       { label: '표준공정관리', path: '/base/processes' },
       { label: '제품별표준공정관리', path: '/base/item-processes' },
+      { label: 'BOM관리', path: '/base/bom' },
       { label: '공구관리', path: '/base/tools' },
       { label: '설비관리', path: '/base/equipments' },
     ],
@@ -82,6 +84,7 @@ export const ROUTES = {
   '/base/items': { render: base.items, title: '품목관리', group: '기준정보관리' },
   '/base/processes': { render: processMaster, title: '표준공정관리', group: '기준정보관리' },
   '/base/item-processes': { render: itemRouting, title: '제품별표준공정관리', group: '기준정보관리' },
+  '/base/bom': { render: bomManager, title: 'BOM관리', group: '기준정보관리' },
   '/base/tools': { render: base.tools, title: '공구관리', group: '기준정보관리' },
   '/base/equipments': { render: base.equipments, title: '설비관리', group: '기준정보관리' },
 

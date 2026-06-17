@@ -90,6 +90,13 @@ export const SEED = {
     { process_code: 'OP40', equipment_code: 'CMM-01', equipment_name: '3차원측정기' },
     { process_code: 'OP50', equipment_code: 'PKG-01', equipment_name: '자동포장기' },
   ],
+  boms: [
+    { item_code: 'P-1001', component_code: 'S-2001', component_name: '가공 브라켓', qty: 1, unit: 'EA' },
+    { item_code: 'P-1001', component_code: 'M-4001', component_name: '볼트 M6x20', qty: 4, unit: 'EA' },
+    { item_code: 'P-1002', component_code: 'M-3001', component_name: 'AL 6061 판재', qty: 1, unit: 'EA' },
+    { item_code: 'P-1002', component_code: 'M-4001', component_name: '볼트 M6x20', qty: 6, unit: 'EA' },
+    { item_code: 'S-2001', component_code: 'M-3001', component_name: 'AL 6061 판재', qty: 1, unit: 'EA' },
+  ],
   tools: [
     { code: 'T-001', name: '엔드밀 Ø10', tool_type: '절삭', spec: 'Ø10 4날', maker: 'YG-1', life_count: 500, unit: 'EA', safety_stock: 10, location: '공구실 A-1', use_yn: true },
     { code: 'T-002', name: '드릴 Ø6.8', tool_type: '절삭', spec: 'Ø6.8 HSS', maker: 'OSG', life_count: 800, unit: 'EA', safety_stock: 15, location: '공구실 A-2', use_yn: true },
