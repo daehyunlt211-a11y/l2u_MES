@@ -116,10 +116,11 @@ export async function popDetail(root, params = {}) {
   let equips = [], users = [];
   try { equips = await db.all('equipments', { sort: 'code' }); } catch { equips = []; }
   try { users = (await db.all('users', { sort: 'name' })).filter(u => u.use_yn !== false); } catch { users = []; }
-  // 공정별 대상 품목명(반제품 단계 표시용)
-  const itemNameMap = {};
-  try { for (const it of await db.all('items', {})) itemNameMap[it.code] = it.name; } catch { /* noop */ }
+  // 공정별 대상 품목명/유형(구성품 단계 표시용)
+  const itemNameMap = {}, itemTypeMap = {};
+  try { for (const it of await db.all('items', {})) { itemNameMap[it.code] = it.name; itemTypeMap[it.code] = it.item_type; } } catch { /* noop */ }
   const itemNameOf = (code) => itemNameMap[code] || code || '';
+  const itemTypeOf = (code) => itemTypeMap[code] || '구성품';
 
   render();
 
@@ -171,7 +172,7 @@ export async function popDetail(root, params = {}) {
       return `<div class="proc-step s-${escapeHtml(st)}" data-id="${p.id}">
         <div class="proc-step__seq">${escapeHtml(String(p.seq ?? ''))}</div>
         <div class="proc-step__body">
-          <div class="proc-step__name">${isSub ? `<span class="badge badge--info" style="margin-right:6px">반제품 ${escapeHtml(itemNameOf(p.item_code))}</span>` : ''}${escapeHtml(p.process_name || p.process_code || '공정')}</div>
+          <div class="proc-step__name">${isSub ? `<span class="badge badge--info" style="margin-right:6px">${escapeHtml(itemTypeOf(p.item_code))} ${escapeHtml(itemNameOf(p.item_code))}</span>` : ''}${escapeHtml(p.process_name || p.process_code || '공정')}</div>
           <div class="proc-step__sub">
             ${p.process_code ? `<span>${escapeHtml(p.process_code)}</span>` : ''}
             ${p.equipment ? `<span>설비 ${escapeHtml(p.equipment)}</span>` : ''}
@@ -327,13 +328,18 @@ async function loadOrCreateProcesses(wo) {
   const itemType = {}; for (const it of items) itemType[it.code] = it.item_type;
   let boms = []; try { boms = await db.all('boms', {}); } catch { boms = []; }
   const bomByItem = {}; for (const b of boms) (bomByItem[b.item_code] ??= []).push(b);
+  // 라우팅(제품별표준공정)이 정의된 품목 집합
+  let allRouting = []; try { allRouting = await db.all('item_processes', {}); } catch { allRouting = []; }
+  const hasRouting = new Set(allRouting.map(r => r.item_code));
 
-  // 처리 순서: 하위 반제품(깊은 것)부터 → 상위 반제품 → 모품목(마지막)
+  // 처리 순서: 하위 구성품(깊은 것)부터 → 상위 구성품 → 모품목(마지막)
+  // 반제품이거나, 라우팅(공정)이 등록된 구성품이면 공정을 전개한다.
   const order = []; const seen = new Set();
   (function expand(code) {
     if (seen.has(code)) return; seen.add(code);
     for (const c of (bomByItem[code] || [])) {
-      if (itemType[c.component_code] === '반제품') expand(c.component_code);
+      const cc = c.component_code;
+      if (itemType[cc] === '반제품' || hasRouting.has(cc)) expand(cc);
     }
     order.push(code);
   })(wo.item_code);
