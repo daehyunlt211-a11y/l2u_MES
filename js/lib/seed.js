@@ -80,6 +80,8 @@ export const SEED = {
     { item_code: 'P-1001', process_code: 'OP40', seq: 40, process_name: '검사', std_time: 5, equipment: 'CMM-01' },
     { item_code: 'P-1002', process_code: 'OP10', seq: 10, process_name: 'CNC 황삭', std_time: 14, equipment: 'CNC-01' },
     { item_code: 'P-1002', process_code: 'OP30', seq: 20, process_name: '조립', std_time: 10, equipment: 'ASSY-01' },
+    { item_code: 'S-2001', process_code: 'OP10', seq: 10, process_name: 'CNC 황삭', std_time: 12, equipment: 'CNC-01' },
+    { item_code: 'S-2001', process_code: 'OP20', seq: 20, process_name: 'CNC 정삭', std_time: 16, equipment: 'CNC-02' },
   ],
   process_equipments: [
     { process_code: 'OP10', equipment_code: 'CNC-01', equipment_name: 'MCT 머시닝센터 1호기' },

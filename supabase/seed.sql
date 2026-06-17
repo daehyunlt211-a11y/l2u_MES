@@ -75,7 +75,9 @@ insert into item_processes (item_code, process_code, seq, process_name, std_time
   ('P-1001','OP30',30,'조립',8,'ASSY-01'),
   ('P-1001','OP40',40,'검사',5,'CMM-01'),
   ('P-1002','OP10',10,'CNC 황삭',14,'CNC-01'),
-  ('P-1002','OP30',20,'조립',10,'ASSY-01')
+  ('P-1002','OP30',20,'조립',10,'ASSY-01'),
+  ('S-2001','OP10',10,'CNC 황삭',12,'CNC-01'),
+  ('S-2001','OP20',20,'CNC 정삭',16,'CNC-02')
 on conflict do nothing;
 
 -- ---------- 1-5b 공정별 사용설비 ----------

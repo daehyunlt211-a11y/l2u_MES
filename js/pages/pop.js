@@ -116,6 +116,10 @@ export async function popDetail(root, params = {}) {
   let equips = [], users = [];
   try { equips = await db.all('equipments', { sort: 'code' }); } catch { equips = []; }
   try { users = (await db.all('users', { sort: 'name' })).filter(u => u.use_yn !== false); } catch { users = []; }
+  // 공정별 대상 품목명(반제품 단계 표시용)
+  const itemNameMap = {};
+  try { for (const it of await db.all('items', {})) itemNameMap[it.code] = it.name; } catch { /* noop */ }
+  const itemNameOf = (code) => itemNameMap[code] || code || '';
 
   render();
 
@@ -149,10 +153,11 @@ export async function popDetail(root, params = {}) {
 
   // 부적합 등록 (부적합관리와 동일한 팝업) — 종료한 공정으로 고정, 등록 전 닫기 불가
   function openNcr(proc) {
+    const code = proc?.item_code || wo.item_code;
     openNonconformanceForm({
       mandatory: true, lockProcess: true,
       prefill: {
-        occur_date: todayStr(), process: proc?.process_name || '', item_code: wo.item_code, item_name: wo.item_name,
+        occur_date: todayStr(), process: proc?.process_name || '', item_code: code, item_name: itemNameOf(code),
         defect_qty: proc?.defect_qty || 0, worker: proc?.worker || getWorker(), status: '처리중',
       },
     });
@@ -162,10 +167,11 @@ export async function popDetail(root, params = {}) {
     const slot = root.querySelector('#proc-list');
     slot.innerHTML = procs.map(p => {
       const st = p.status || '대기';
+      const isSub = p.item_code && p.item_code !== wo.item_code; // BOM 반제품 단계
       return `<div class="proc-step s-${escapeHtml(st)}" data-id="${p.id}">
         <div class="proc-step__seq">${escapeHtml(String(p.seq ?? ''))}</div>
         <div class="proc-step__body">
-          <div class="proc-step__name">${escapeHtml(p.process_name || p.process_code || '공정')}</div>
+          <div class="proc-step__name">${isSub ? `<span class="badge badge--info" style="margin-right:6px">반제품 ${escapeHtml(itemNameOf(p.item_code))}</span>` : ''}${escapeHtml(p.process_name || p.process_code || '공정')}</div>
           <div class="proc-step__sub">
             ${p.process_code ? `<span>${escapeHtml(p.process_code)}</span>` : ''}
             ${p.equipment ? `<span>설비 ${escapeHtml(p.equipment)}</span>` : ''}
@@ -291,8 +297,9 @@ export async function popDetail(root, params = {}) {
     try {
       const all = await db.all('production_results', {});
       const result_no = nextDocNo('PR', all.map(x => x.result_no));
+      const code = p.item_code || wo.item_code;
       await db.insert('production_results', {
-        result_no, result_date: todayStr(), wo_no: wo.wo_no, item_code: wo.item_code, item_name: wo.item_name,
+        result_no, result_date: todayStr(), wo_no: wo.wo_no, item_code: code, item_name: itemNameOf(code),
         process: p.process_name, equipment: p.equipment || wo.equipment, worker: p.worker || getWorker(),
         good_qty: good, defect_qty: defect, work_time: workTime, status: '완료',
       });
@@ -310,27 +317,48 @@ export async function popDetail(root, params = {}) {
   }
 }
 
-// 작업지시 공정 로드, 없으면 라우팅(item_processes)으로 생성
+// 작업지시 공정 로드, 없으면 생성.
+// BOM 다단계 전개: 모품목의 반제품 구성품 공정을 먼저, 그다음 모품목 공정 순으로 생성.
 async function loadOrCreateProcesses(wo) {
   let rows = await db.all('work_order_processes', { filters: { wo_no: wo.wo_no }, sort: 'seq' });
   if (rows.length) return rows;
 
-  let routing = [];
-  try { routing = await db.all('item_processes', { filters: { item_code: wo.item_code }, sort: 'seq' }); } catch { routing = []; }
-  if (routing.length) {
-    for (const r of routing) {
+  const items = await db.all('items', {}).catch(() => []);
+  const itemType = {}; for (const it of items) itemType[it.code] = it.item_type;
+  let boms = []; try { boms = await db.all('boms', {}); } catch { boms = []; }
+  const bomByItem = {}; for (const b of boms) (bomByItem[b.item_code] ??= []).push(b);
+
+  // 처리 순서: 하위 반제품(깊은 것)부터 → 상위 반제품 → 모품목(마지막)
+  const order = []; const seen = new Set();
+  (function expand(code) {
+    if (seen.has(code)) return; seen.add(code);
+    for (const c of (bomByItem[code] || [])) {
+      if (itemType[c.component_code] === '반제품') expand(c.component_code);
+    }
+    order.push(code);
+  })(wo.item_code);
+
+  let seq = 0;
+  for (const code of order) {
+    let routing = [];
+    try { routing = await db.all('item_processes', { filters: { item_code: code }, sort: 'seq' }); } catch { routing = []; }
+    if (routing.length) {
+      for (const r of routing) {
+        seq += 10;
+        await db.insert('work_order_processes', {
+          wo_no: wo.wo_no, item_code: code, seq,
+          process_code: r.process_code || '', process_name: r.process_name || r.process_code || '공정',
+          equipment: '', status: '대기', good_qty: 0, defect_qty: 0, work_time: 0,
+        });
+      }
+    } else if (code === wo.item_code) {
+      // 모품목 라우팅이 없으면 단일 공정 (반제품 라우팅 없으면 스킵)
+      seq += 10;
       await db.insert('work_order_processes', {
-        wo_no: wo.wo_no, item_code: wo.item_code, seq: r.seq ?? 10,
-        process_code: r.process_code || '', process_name: r.process_name || r.process_code || '공정',
-        equipment: '', status: '대기', good_qty: 0, defect_qty: 0, work_time: 0, // 설비호기는 POP 시작 시 선택
+        wo_no: wo.wo_no, item_code: code, seq, process_code: '',
+        process_name: wo.process || '작업', equipment: '', status: '대기', good_qty: 0, defect_qty: 0, work_time: 0,
       });
     }
-  } else {
-    // 라우팅 미정의 시 작업지시의 단일 공정으로 생성
-    await db.insert('work_order_processes', {
-      wo_no: wo.wo_no, item_code: wo.item_code, seq: 10, process_code: '',
-      process_name: wo.process || '작업', equipment: wo.equipment || '', status: '대기', good_qty: 0, defect_qty: 0, work_time: 0,
-    });
   }
   return db.all('work_order_processes', { filters: { wo_no: wo.wo_no }, sort: 'seq' });
 }
