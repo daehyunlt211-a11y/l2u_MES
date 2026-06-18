@@ -33,8 +33,9 @@ export async function itemRouting(root) {
   const itemsSlot = root.querySelector('#rt-items');
   function renderItems(filter = '') {
     const q = filter.toLowerCase();
-    const list = items.filter(i => !q || [i.code, i.name, i.spec].some(v => String(v ?? '').toLowerCase().includes(q)));
-    if (!list.length) { itemsSlot.innerHTML = `<div class="empty" style="padding:40px 12px">${icon('inbox', 40)}<h4>품목이 없습니다</h4></div>`; return; }
+    const list = items.filter(i => ['완제품', '반제품'].includes(i.item_type))
+      .filter(i => !q || [i.code, i.name, i.spec].some(v => String(v ?? '').toLowerCase().includes(q)));
+    if (!list.length) { itemsSlot.innerHTML = `<div class="empty" style="padding:40px 12px">${icon('inbox', 40)}<h4>완제품·반제품이 없습니다</h4><p>원자재·부자재는 공정 대상이 아닙니다.</p></div>`; return; }
     itemsSlot.innerHTML = list.map(i => `
       <div class="rt-item ${state.itemCode === i.code ? 'active' : ''}" data-code="${escapeHtml(i.code)}"
         style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer">

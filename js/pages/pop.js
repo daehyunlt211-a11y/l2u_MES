@@ -27,11 +27,21 @@ export async function popList(root) {
     </div>
     <div id="pop-list"><div class="spinner"></div></div>`;
 
-  root.querySelector('#pop-actions').innerHTML = `<button class="btn" id="pop-refresh">${icon('refresh', 16)} 새로고침</button>`;
-  root.querySelector('#pop-refresh').onclick = () => popList(root);
-
-  const state = { search: '', status: '__all__' };
+  const state = { search: '', status: '__all__', view: localStorage.getItem('mes_pop_view') || 'card' };
   const statuses = ['작업중', '완료', '중단'];
+
+  root.querySelector('#pop-actions').innerHTML = `
+    <div class="seg-toggle" id="pop-view">
+      <button data-view="card" class="${state.view === 'card' ? 'active' : ''}" title="카드 보기">${icon('grid', 16)}</button>
+      <button data-view="list" class="${state.view === 'list' ? 'active' : ''}" title="리스트 보기">${icon('menu', 16)}</button>
+    </div>
+    <button class="btn" id="pop-refresh">${icon('refresh', 16)} 새로고침</button>`;
+  root.querySelector('#pop-refresh').onclick = () => popList(root);
+  root.querySelectorAll('#pop-view [data-view]').forEach(b => b.onclick = () => {
+    state.view = b.dataset.view; localStorage.setItem('mes_pop_view', state.view);
+    root.querySelectorAll('#pop-view [data-view]').forEach(x => x.classList.toggle('active', x.dataset.view === state.view));
+    renderList();
+  });
 
   let wos = [];
   try { wos = await db.all('work_orders', { sort: 'wo_date', sortDir: 'desc' }); }
@@ -62,25 +72,31 @@ export async function popList(root) {
     );
     const slot = root.querySelector('#pop-list');
     if (!list.length) { slot.innerHTML = `<div class="empty">${icon('inbox', 52)}<h4>진행할 작업이 없습니다</h4><p>작업지시관리에서 <b>'작업시작'</b> 버튼을 누른 작업지시가 여기에 표시됩니다.</p></div>`; return; }
-    slot.innerHTML = `<div class="pop-grid">${list.map(w => {
-      const procs = procByWo[w.wo_no] || [];
-      const done = procs.filter(p => p.status === '완료').length;
-      const prog = procs.length ? `${done}/${procs.length} 공정` : '공정 미생성';
-      const good = procs.reduce((s, p) => s + (+p.good_qty || 0), 0);
-      return `<div class="pop-card s-${escapeHtml(w.status)}" data-wo="${escapeHtml(w.wo_no)}">
+    const stat = (w) => { const procs = procByWo[w.wo_no] || []; const done = procs.filter(p => p.status === '완료').length; return { procs, done, prog: procs.length ? `${done}/${procs.length} 공정` : '공정 미생성', good: procs.reduce((s, p) => s + (+p.good_qty || 0), 0) }; };
+
+    if (state.view === 'list') {
+      slot.innerHTML = `<div class="table-wrap"><table class="grid">
+        <thead><tr><th>작업지시번호</th><th>품목코드</th><th>품명</th><th class="num">지시수량</th><th class="center">공정진행</th><th class="num">양품</th><th class="center">상태</th><th></th></tr></thead>
+        <tbody>${list.map(w => { const s = stat(w); return `<tr class="clickable" data-wo="${escapeHtml(w.wo_no)}">
+          <td class="cell-code">${escapeHtml(w.wo_no)}</td><td class="cell-code">${escapeHtml(w.item_code || '')}</td>
+          <td class="cell-strong">${escapeHtml(w.item_name || '')}</td><td class="num mono">${num(w.order_qty)}</td>
+          <td class="center">${escapeHtml(s.prog)}</td><td class="num mono">${num(s.good)}</td>
+          <td class="center">${badge(w.status)}</td><td class="center">${icon('chevronRight', 16)}</td></tr>`; }).join('')}</tbody>
+      </table></div>`;
+    } else {
+      slot.innerHTML = `<div class="pop-grid">${list.map(w => { const s = stat(w); return `<div class="pop-card s-${escapeHtml(w.status)}" data-wo="${escapeHtml(w.wo_no)}">
         <div class="pop-card__top"><span class="pop-card__no">${escapeHtml(w.wo_no)}</span>${badge(w.status)}</div>
         <div class="pop-card__item">${escapeHtml(w.item_name || '')}</div>
         <div class="pop-card__meta">
           <span><b>품목</b> ${escapeHtml(w.item_code || '-')}</span>
-          <span><b>설비</b> ${escapeHtml(w.equipment || '-')}</span>
           <span><b>납기</b> ${escapeHtml((w.due_date || '').slice(0, 10) || '-')}</span>
         </div>
         <div class="pop-card__foot">
-          <div class="pop-card__qty">${num(good)}<small> / ${num(w.order_qty)} EA</small></div>
-          <div class="pop-card__prog">${prog} ${icon('chevronRight', 16)}</div>
+          <div class="pop-card__qty">${num(s.good)}<small> / ${num(w.order_qty)} EA</small></div>
+          <div class="pop-card__prog">${s.prog} ${icon('chevronRight', 16)}</div>
         </div>
-      </div>`;
-    }).join('')}</div>`;
+      </div>`; }).join('')}</div>`;
+    }
     slot.querySelectorAll('[data-wo]').forEach(c => c.onclick = () => { location.hash = `#/pop/detail?wo=${encodeURIComponent(c.dataset.wo)}`; });
   }
 
@@ -121,6 +137,9 @@ export async function popDetail(root, params = {}) {
   try { for (const it of await db.all('items', {})) { itemNameMap[it.code] = it.name; itemTypeMap[it.code] = it.item_type; } } catch { /* noop */ }
   const itemNameOf = (code) => itemNameMap[code] || code || '';
   const itemTypeOf = (code) => itemTypeMap[code] || '구성품';
+  // BOM 구조(완제품→반제품→원자재)
+  const bomByItem = {};
+  try { for (const b of await db.all('boms', {})) (bomByItem[b.item_code] ??= []).push(b); } catch { /* noop */ }
 
   render();
 
@@ -147,9 +166,52 @@ export async function popDetail(root, params = {}) {
         <div class="d-metric"><div class="v mono" style="color:var(--danger)">${num(totalDefect)}</div><div class="l">불량(EA)</div></div>
       </div>
       <div class="progress" style="height:10px;margin-bottom:18px"><span style="width:${progPct}%"></span></div>
-      <div id="proc-list"></div>`;
+      <div class="pop-detail-grid">
+        <div id="proc-list"></div>
+        <div class="card"><div class="card__head">${icon('layers', 18)}<h3>BOM 구조</h3></div><div class="card__body" id="bom-panel"></div></div>
+      </div>`;
     bindBack(root);
     renderProcs();
+    renderBomPanel();
+  }
+
+  // 현재 진행/예정 공정의 대상 품목 (BOM에서 위치 강조)
+  function currentItemCode() {
+    const cur = procs.find(p => p.status === '진행') || procs.find(p => p.status !== '완료');
+    return cur ? (cur.item_code || wo.item_code) : null;
+  }
+  function currentProcName() {
+    const cur = procs.find(p => p.status === '진행') || procs.find(p => p.status !== '완료');
+    return cur ? (cur.process_name || cur.process_code || '') : '';
+  }
+
+  function renderBomPanel() {
+    const panel = root.querySelector('#bom-panel');
+    if (!panel) return;
+    const curItem = currentItemCode();
+    const tone = (t) => t === '완제품' ? 'brand' : t === '반제품' ? 'info' : t === '원자재' ? 'warning' : 'neutral';
+    const rows = [{ depth: 0, code: wo.item_code, name: itemNameOf(wo.item_code), type: itemTypeOf(wo.item_code) || '완제품' }];
+    (function walk(code, depth, path) {
+      for (const b of (bomByItem[code] || [])) {
+        if (path.has(b.component_code)) continue;
+        rows.push({ depth, code: b.component_code, name: b.component_name || itemNameOf(b.component_code), type: itemTypeOf(b.component_code) });
+        walk(b.component_code, depth + 1, new Set([...path, b.component_code]));
+      }
+    })(wo.item_code, 1, new Set([wo.item_code]));
+
+    panel.innerHTML = rows.map(r => {
+      const isCur = r.code === curItem;
+      // 공정 대상(완제품/반제품)인지 — 공정이 있는 품목
+      const isProcessed = procs.some(p => (p.item_code || wo.item_code) === r.code);
+      return `<div class="flex" style="gap:7px;padding:7px 8px;border-radius:8px;${isCur ? 'background:var(--brand-50);box-shadow:inset 3px 0 0 var(--brand-500)' : ''}">
+        <span style="display:inline-block;width:${r.depth * 16}px;flex-shrink:0"></span>
+        ${r.depth ? '<span style="color:var(--text-3)">└</span>' : icon('package', 15)}
+        <span class="cell-code">${escapeHtml(r.code)}</span>
+        <span style="font-weight:${isCur ? 700 : 600};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(r.name)}</span>
+        ${badge(r.type || '구성품', tone(r.type))}
+        ${isCur ? `<span class="badge badge--brand" style="margin-left:auto;flex-shrink:0">▶ 현재공정</span>` : (isProcessed ? '' : `<span class="muted" style="margin-left:auto;font-size:11px;flex-shrink:0">투입</span>`)}
+      </div>`;
+    }).join('') + (curItem ? `<div class="muted" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12.5px">▶ 현재 진행: <b>${escapeHtml(itemNameOf(curItem))}</b> · ${escapeHtml(currentProcName())}</div>` : '');
   }
 
   // 부적합 등록 (부적합관리와 동일한 팝업) — 종료한 공정으로 고정, 등록 전 닫기 불가
