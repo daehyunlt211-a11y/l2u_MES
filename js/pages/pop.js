@@ -284,10 +284,28 @@ export async function popDetail(root, params = {}) {
         equipOptions = equips.filter(e => names.has(e.name) || codes.has(e.code));
       } catch { /* 테이블 미생성 시에만 전체 노출 */ }
     }
+    // 투입 자재(BOM) — 이 공정 품목의 직접 구성품(원자재·반제품·부자재)
+    const comps = bomByItem[p.item_code || wo.item_code] || [];
+    const tone = (t) => t === '완제품' ? 'brand' : t === '반제품' ? 'info' : t === '원자재' ? 'warning' : 'neutral';
+    const inputsHtml = comps.length ? `
+      <div class="field col-2"><label>투입 자재 (BOM · 지시수량 ${num(wo.order_qty)} 기준)</label>
+        <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
+          ${comps.map((c, i) => {
+      const t = itemTypeOf(c.component_code);
+      const total = (+c.qty || 0) * (+wo.order_qty || 0);
+      return `<div class="flex" style="gap:8px;padding:9px 12px;${i ? 'border-top:1px solid var(--border)' : ''}">
+            <span class="cell-code">${escapeHtml(c.component_code)}</span>
+            <span style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(c.component_name || itemNameOf(c.component_code))}</span>
+            ${badge(t || '자재', tone(t))}
+            <span class="muted mono" style="margin-left:auto;flex-shrink:0">${num(c.qty)} ${escapeHtml(c.unit || 'EA')}/개 · 총 ${num(total)}</span>
+          </div>`;
+    }).join('')}
+        </div></div>` : `<div class="field col-2"><div class="muted" style="padding:4px 2px">이 공정에 등록된 투입 자재(BOM)가 없습니다.</div></div>`;
+
     const body = document.createElement('form');
     body.className = 'form-grid';
     body.innerHTML = `
-      <div class="field col-2"><label>공정</label><input class="input" value="${escapeHtml(p.process_name || '')}" readonly></div>
+      <div class="field col-2"><label>공정</label><input class="input" value="${escapeHtml((p.item_code && p.item_code !== wo.item_code ? `[${itemNameOf(p.item_code)}] ` : '') + (p.process_name || ''))}" readonly></div>
       <div class="field"><label>작업자 <span class="req">*</span></label>
         <select class="select" name="worker"><option value="">선택</option>
           ${users.map(u => `<option value="${escapeHtml(u.name)}" ${u.name === getWorker() ? 'selected' : ''}>${escapeHtml(u.name)}${u.department ? ` (${escapeHtml(u.department)})` : ''}</option>`).join('')}
@@ -295,7 +313,8 @@ export async function popDetail(root, params = {}) {
       <div class="field"><label>설비호기 <span class="req">*</span></label>
         <select class="select" name="equipment"><option value="">선택</option>
           ${equipOptions.map(e => `<option value="${escapeHtml(e.name)}" ${e.name === p.equipment ? 'selected' : ''}>${escapeHtml(e.code)} · ${escapeHtml(e.name)}</option>`).join('')}
-        </select>${(p.process_code && equipOptions.length === 0) ? `<div class="field__err" style="color:var(--warning)">이 공정에 등록된 설비가 없습니다. 표준공정관리에서 설비를 지정하세요.</div>` : ''}</div>`;
+        </select>${(p.process_code && equipOptions.length === 0) ? `<div class="field__err" style="color:var(--warning)">이 공정에 등록된 설비가 없습니다. 표준공정관리에서 설비를 지정하세요.</div>` : ''}</div>
+      ${inputsHtml}`;
     openModal({
       title: `${p.process_name} 작업 시작`, body,
       footer: `<button class="btn" data-cancel>취소</button><button class="btn btn--primary" data-ok>${icon('activity', 16)} 작업 시작</button>`,
