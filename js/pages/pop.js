@@ -193,16 +193,24 @@ export async function popDetail(root, params = {}) {
     slot.querySelectorAll('[data-end]').forEach(b => b.onclick = () => endProc(b.closest('[data-id]').dataset.id));
   }
 
+  // 반제품 공정이 모두 끝나야 완제품(모품목) 공정 시작 가능
+  function subPending() { return procs.some(x => x.item_code && x.item_code !== wo.item_code && x.status !== '완료'); }
+  function isParentStep(p) { return !p.item_code || p.item_code === wo.item_code; }
+
   function stepButtons(p) {
     const st = p.status || '대기';
     if (st === '완료') return `<span class="badge badge--success" style="height:36px;padding:0 16px;font-size:14px">완료</span>`;
     if (st === '진행') return `<button class="btn btn--pop btn--end" data-end>${icon('check', 18)} 종료</button>`;
+    if (isParentStep(p) && subPending()) {
+      return `<button class="btn btn--pop" disabled title="반제품 공정 완료 후 시작 가능">${icon('clock', 18)} 반제품 대기</button>`;
+    }
     return `<button class="btn btn--pop btn--start" data-start>${icon('activity', 18)} 시작</button>`;
   }
 
   // 공정 시작 — 작업자·설비호기를 선택 (설비는 해당 표준공정에 등록된 설비만)
   async function startProc(id) {
     const p = procs.find(x => String(x.id) === String(id));
+    if (isParentStep(p) && subPending()) { toast('반제품 공정을 모두 완료한 뒤 완제품 공정을 시작할 수 있습니다.', 'error'); return; }
     // 설비호기 후보 = 표준공정관리에서 이 공정에 등록한 설비만.
     // (등록 0건이면 빈 목록으로 두고 안내 표시. process_equipments 테이블이 없을 때만 전체 폴백)
     let equipOptions = equips;
@@ -328,18 +336,14 @@ async function loadOrCreateProcesses(wo) {
   const itemType = {}; for (const it of items) itemType[it.code] = it.item_type;
   let boms = []; try { boms = await db.all('boms', {}); } catch { boms = []; }
   const bomByItem = {}; for (const b of boms) (bomByItem[b.item_code] ??= []).push(b);
-  // 라우팅(제품별표준공정)이 정의된 품목 집합
-  let allRouting = []; try { allRouting = await db.all('item_processes', {}); } catch { allRouting = []; }
-  const hasRouting = new Set(allRouting.map(r => r.item_code));
 
-  // 처리 순서: 하위 구성품(깊은 것)부터 → 상위 구성품 → 모품목(마지막)
-  // 반제품이거나, 라우팅(공정)이 등록된 구성품이면 공정을 전개한다.
+  // 처리 순서: 하위 반제품(깊은 것)부터 → 상위 반제품 → 모품목(마지막)
+  // 반제품만 공정 전개(원자재·부자재는 공정 없이 소비만 됨).
   const order = []; const seen = new Set();
   (function expand(code) {
     if (seen.has(code)) return; seen.add(code);
     for (const c of (bomByItem[code] || [])) {
-      const cc = c.component_code;
-      if (itemType[cc] === '반제품' || hasRouting.has(cc)) expand(cc);
+      if (itemType[c.component_code] === '반제품') expand(c.component_code);
     }
     order.push(code);
   })(wo.item_code);

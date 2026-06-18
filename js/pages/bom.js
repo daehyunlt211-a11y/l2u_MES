@@ -11,8 +11,11 @@ export async function bomManager(root) {
     </div>
     <div style="display:grid;grid-template-columns:340px 1fr;gap:18px;align-items:start">
       <div class="card">
-        <div class="toolbar"><div class="search-box grow">${icon('search', 16)}<input id="bom-search" placeholder="품목코드·품명 검색" autocomplete="off"/></div></div>
-        <div id="bom-items" style="max-height:62vh;overflow-y:auto"></div>
+        <div class="toolbar" style="flex-direction:column;align-items:stretch;gap:10px">
+          <div class="chips" id="bom-tabs"></div>
+          <div class="search-box grow">${icon('search', 16)}<input id="bom-search" placeholder="품목코드·품명 검색" autocomplete="off"/></div>
+        </div>
+        <div id="bom-items" style="max-height:60vh;overflow-y:auto"></div>
       </div>
       <div class="card" id="bom-editor"><div class="card__body"><div class="empty" style="padding:80px 20px">${icon('layers', 52)}<h4>모품목을 선택하세요</h4><p>왼쪽에서 품목을 선택하면 BOM(구성품)을 편집할 수 있습니다.</p></div></div></div>
     </div>`;
@@ -24,15 +27,25 @@ export async function bomManager(root) {
   // 모품목 후보: 완제품/반제품 (그 외 품목도 선택 가능하게 전체 노출하되 정렬은 유형 우선)
   const itemByCode = Object.fromEntries(items.map(i => [i.code, i]));
 
-  const state = { code: null, rows: [], removedIds: [], counts: {}, allBoms };
+  const state = { code: null, rows: [], removedIds: [], counts: {}, allBoms, tab: '완제품' };
   for (const b of allBoms) state.counts[b.item_code] = (state.counts[b.item_code] || 0) + 1;
+
+  const TABS = ['완제품', '반제품'];
+  const tabsSlot = root.querySelector('#bom-tabs');
+  function renderTabs() {
+    tabsSlot.innerHTML = TABS.map(t => {
+      const cnt = items.filter(i => i.item_type === t).length;
+      return `<button class="chip ${state.tab === t ? 'active' : ''}" data-tab="${t}">${t}<span class="chip__count">${cnt}</span></button>`;
+    }).join('');
+    tabsSlot.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { state.tab = b.dataset.tab; renderTabs(); renderItems(root.querySelector('#bom-search').value.trim()); });
+  }
 
   const itemsSlot = root.querySelector('#bom-items');
   function renderItems(filter = '') {
     const q = filter.toLowerCase();
-    const list = items.filter(i => ['완제품', '반제품'].includes(i.item_type) || state.counts[i.code])
+    const list = items.filter(i => i.item_type === state.tab)
       .filter(i => !q || [i.code, i.name, i.spec].some(v => String(v ?? '').toLowerCase().includes(q)));
-    if (!list.length) { itemsSlot.innerHTML = `<div class="empty" style="padding:40px 12px">${icon('inbox', 40)}<h4>품목이 없습니다</h4><p>완제품·반제품을 먼저 등록하세요.</p></div>`; return; }
+    if (!list.length) { itemsSlot.innerHTML = `<div class="empty" style="padding:40px 12px">${icon('inbox', 40)}<h4>${escapeHtml(state.tab)}이 없습니다</h4><p>품목관리에서 먼저 등록하세요.</p></div>`; return; }
     itemsSlot.innerHTML = list.map(i => `
       <div class="rt-item ${state.code === i.code ? 'active' : ''}" data-code="${escapeHtml(i.code)}"
         style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer">
@@ -188,6 +201,7 @@ export async function bomManager(root) {
     }
   }
 
+  renderTabs();
   renderItems();
   root.querySelector('#bom-search').addEventListener('input', (e) => renderItems(e.target.value.trim()));
 }
