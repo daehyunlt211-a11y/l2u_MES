@@ -77,8 +77,12 @@ export async function bomManager(root) {
     const item = itemByCode[state.code];
     const editor = root.querySelector('#bom-editor');
     state.rows.sort((a, b) => String(a.component_code).localeCompare(String(b.component_code)));
-    // 구성품 후보: 자기 자신 제외
-    const compOptions = items.filter(i => i.code !== state.code)
+    // 모품목 유형에 따른 구성품 허용 유형
+    //  - 반제품: 원자재·부자재만
+    //  - 완제품: 반제품·원자재·부자재 (완제품끼리 구성 불가)
+    state.allowTypes = item.item_type === '반제품' ? ['원자재', '부자재'] : ['반제품', '원자재', '부자재'];
+    const placeholder = item.item_type === '반제품' ? '구성품(원자재·부자재) 선택…' : '구성품(반제품·원자재·부자재) 선택…';
+    const compOptions = items.filter(i => i.code !== state.code && state.allowTypes.includes(i.item_type))
       .map(i => `<option value="${escapeHtml(i.code)}">${escapeHtml(i.code)} · ${escapeHtml(i.name)} (${escapeHtml(i.item_type || '')})</option>`).join('');
 
     editor.innerHTML = `
@@ -89,8 +93,9 @@ export async function bomManager(root) {
         <button class="btn btn--primary" id="bom-save">${icon('check', 16)} 저장</button>
       </div>
       <div class="card__body">
+        <div class="muted" style="margin-bottom:10px">구성 가능 유형: <b>${state.allowTypes.join(' · ')}</b></div>
         <div class="flex" style="gap:10px;margin-bottom:14px">
-          <select class="select" id="bom-add-comp" style="max-width:360px"><option value="">구성품(자재/반제품) 선택…</option>${compOptions}</select>
+          <select class="select" id="bom-add-comp" style="max-width:360px"><option value="">${placeholder}</option>${compOptions}</select>
           <button class="btn" id="bom-add">${icon('plus', 16)} 구성품 추가</button>
           <div class="spacer"></div><span class="muted">총 ${state.rows.length}개 구성품</span>
         </div>
@@ -174,6 +179,7 @@ export async function bomManager(root) {
     if (!code) { toast('추가할 구성품을 선택하세요.', 'error'); return; }
     if (state.rows.some(r => r.component_code === code)) { toast('이미 추가된 구성품입니다.', 'error'); return; }
     const it = itemByCode[code] || {};
+    if (state.allowTypes && !state.allowTypes.includes(it.item_type)) { toast(`${it.item_type} 은(는) 구성품으로 추가할 수 없습니다. (가능: ${state.allowTypes.join('·')})`, 'error'); return; }
     state.rows.push({ item_code: state.code, component_code: code, component_name: it.name || code, qty: 1, unit: it.unit || 'EA', remark: '' });
     sel.value = '';
     renderEditor();
