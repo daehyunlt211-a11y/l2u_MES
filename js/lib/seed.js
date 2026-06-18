@@ -104,11 +104,25 @@ export const SEED = {
     { process_code: 'OP50', equipment_code: 'PKG-01', equipment_name: '자동포장기' },
   ],
   boms: [
+    // 완제품 → 반제품 → 원자재 다단계 예시
     { item_code: 'P-1001', component_code: 'S-2001', component_name: '가공 브라켓', qty: 1, unit: 'EA' },
     { item_code: 'P-1001', component_code: 'M-4001', component_name: '볼트 M6x20', qty: 4, unit: 'EA' },
+    { item_code: 'S-2001', component_code: 'M-3001', component_name: 'AL 6061 판재', qty: 1, unit: 'EA' },
     { item_code: 'P-1002', component_code: 'M-3001', component_name: 'AL 6061 판재', qty: 1, unit: 'EA' },
     { item_code: 'P-1002', component_code: 'M-4001', component_name: '볼트 M6x20', qty: 6, unit: 'EA' },
-    { item_code: 'S-2001', component_code: 'M-3001', component_name: 'AL 6061 판재', qty: 1, unit: 'EA' },
+    // 기어박스 ASSY (완제품) → 가공하우징·샤프트(반제품) + 베어링·너트(부자재)
+    { item_code: 'P-1003', component_code: 'S-2002', component_name: '가공 하우징', qty: 1, unit: 'EA' },
+    { item_code: 'P-1003', component_code: 'S-2003', component_name: '샤프트 가공품', qty: 2, unit: 'EA' },
+    { item_code: 'P-1003', component_code: 'M-4005', component_name: '베어링 6204', qty: 4, unit: 'EA' },
+    { item_code: 'P-1003', component_code: 'M-4002', component_name: '너트 M6', qty: 6, unit: 'EA' },
+    // 가공 하우징 (반제품) → SS400 판재(원자재) + 오링(부자재)
+    { item_code: 'S-2002', component_code: 'M-3004', component_name: 'SS400 판재', qty: 1, unit: 'EA' },
+    { item_code: 'S-2002', component_code: 'M-4004', component_name: '오링 P20', qty: 2, unit: 'EA' },
+    // 샤프트 가공품 (반제품) → SCM440 환봉(원자재)
+    { item_code: 'S-2003', component_code: 'M-3003', component_name: 'SCM440 환봉', qty: 1, unit: 'EA' },
+    // 모터 마운트 (완제품) → 가공하우징(반제품) + 볼트(부자재)
+    { item_code: 'P-1004', component_code: 'S-2002', component_name: '가공 하우징', qty: 1, unit: 'EA' },
+    { item_code: 'P-1004', component_code: 'M-4001', component_name: '볼트 M6x20', qty: 4, unit: 'EA' },
   ],
   tools: [
     { code: 'T-001', name: '엔드밀 Ø10', tool_type: '절삭', spec: 'Ø10 4날', maker: 'YG-1', life_count: 500, unit: 'EA', safety_stock: 10, location: '공구실 A-1', use_yn: true },

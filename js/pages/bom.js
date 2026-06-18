@@ -1,7 +1,7 @@
 // BOM관리 — 좌: 모품목 선택 / 우: 구성품(자재·반제품) + 소요량 편집(추가·삭제·저장)
 import { db } from '../lib/db.js';
 import { num, escapeHtml } from '../lib/format.js';
-import { toast } from '../ui/components.js';
+import { toast, badge } from '../ui/components.js';
 import { icon } from '../ui/icons.js';
 
 export async function bomManager(root) {
@@ -24,7 +24,7 @@ export async function bomManager(root) {
   // 모품목 후보: 완제품/반제품 (그 외 품목도 선택 가능하게 전체 노출하되 정렬은 유형 우선)
   const itemByCode = Object.fromEntries(items.map(i => [i.code, i]));
 
-  const state = { code: null, rows: [], removedIds: [], counts: {} };
+  const state = { code: null, rows: [], removedIds: [], counts: {}, allBoms };
   for (const b of allBoms) state.counts[b.item_code] = (state.counts[b.item_code] || 0) + 1;
 
   const itemsSlot = root.querySelector('#bom-items');
@@ -51,7 +51,10 @@ export async function bomManager(root) {
     const editor = root.querySelector('#bom-editor');
     editor.innerHTML = `<div class="card__body"><div class="spinner"></div></div>`;
     let rows = [];
-    try { rows = await db.all('boms', { filters: { item_code: code }, sort: 'component_code' }); }
+    try {
+      rows = await db.all('boms', { filters: { item_code: code }, sort: 'component_code' });
+      state.allBoms = await db.all('boms', {}); // 다단계 전개용 최신화
+    }
     catch (e) { editor.innerHTML = `<div class="card__body">${/boms|relation|does not exist|schema cache/i.test(e.message || '') ? migrationBox() : `<div class="empty">${icon('alert', 48)}<h4>불러오기 실패</h4><p>${escapeHtml(e.message || e)}</p></div>`}</div>`; return; }
     state.rows = rows.map(r => ({ ...r }));
     renderEditor();
@@ -83,11 +86,46 @@ export async function bomManager(root) {
           <tbody></tbody>
         </table></div>
         ${!state.rows.length ? `<div class="empty" style="padding:40px">${icon('layers', 44)}<h4>등록된 구성품이 없습니다</h4><p>위에서 구성품을 선택해 추가하세요.</p></div>` : ''}
+
+        <h4 style="margin:22px 0 10px;display:flex;align-items:center;gap:8px;border-top:1px solid var(--border);padding-top:18px">${icon('layers', 18)} BOM 전개 (완제품 → 반제품 → 원자재)</h4>
+        ${treeView(item)}
       </div>`;
 
     renderRows();
     editor.querySelector('#bom-add').onclick = addComp;
     editor.querySelector('#bom-save').onclick = save;
+  }
+
+  // 다단계 BOM 전개 트리 (현재 편집중인 구성품은 저장 전이라 state.rows 우선 사용)
+  function childrenOf(code) {
+    if (code === state.code) return state.rows.map(r => ({ component_code: r.component_code, component_name: r.component_name, qty: r.qty, unit: r.unit }));
+    return state.allBoms.filter(b => b.item_code === code);
+  }
+  function treeView(item) {
+    const rows = [];
+    (function walk(code, qtyPer, depth, path) {
+      for (const c of childrenOf(code)) {
+        if (path.has(c.component_code)) continue; // 순환 방지
+        const it = itemByCode[c.component_code] || {};
+        const q = qtyPer * (+c.qty || 0);
+        rows.push({ depth, code: c.component_code, name: c.component_name || it.name || '', type: it.item_type || '', qty: q, unit: c.unit || it.unit || 'EA', hasChild: state.allBoms.some(b => b.item_code === c.component_code) || c.component_code === state.code });
+        walk(c.component_code, q, depth + 1, new Set([...path, c.component_code]));
+      }
+    })(state.code, 1, 0, new Set([state.code]));
+
+    const tone = (t) => t === '완제품' ? 'brand' : t === '반제품' ? 'info' : t === '원자재' ? 'warning' : 'neutral';
+    const rootRow = `<div class="flex" style="gap:8px;padding:8px 6px;font-weight:800">${icon('package', 16)}<span class="cell-code">${escapeHtml(item.code)}</span> ${escapeHtml(item.name)} ${badge(item.item_type || '완제품', tone(item.item_type))}<span class="muted" style="margin-left:auto">1 ${escapeHtml(item.unit || 'EA')}</span></div>`;
+    if (!rows.length) return `<div style="border:1px solid var(--border);border-radius:12px;padding:10px 14px">${rootRow}<div class="muted" style="padding:8px 6px 4px">구성품이 없습니다. 위에서 추가 후 저장하면 하위 전개가 표시됩니다.</div></div>`;
+    const body = rows.map(r => `
+      <div class="flex" style="gap:8px;padding:7px 6px;border-top:1px solid var(--border)">
+        <span style="display:inline-block;width:${r.depth * 24}px;flex-shrink:0"></span>
+        <span style="color:var(--text-3)">${'└ '}</span>
+        <span class="cell-code">${escapeHtml(r.code)}</span>
+        <span style="font-weight:600">${escapeHtml(r.name)}</span>
+        ${badge(r.type || '구성품', tone(r.type))}
+        <span class="muted mono" style="margin-left:auto">${num(r.qty)} ${escapeHtml(r.unit)}</span>
+      </div>`).join('');
+    return `<div style="border:1px solid var(--border);border-radius:12px;padding:6px 14px 10px">${rootRow}${body}<div class="muted" style="margin-top:8px;font-size:11.5px">※ 소요량은 모품목 1개 기준 누적 소요량입니다.</div></div>`;
   }
 
   function renderRows() {
