@@ -140,6 +140,17 @@ export async function popDetail(root, params = {}) {
   // BOM 구조(완제품→반제품→원자재)
   const bomByItem = {};
   try { for (const b of await db.all('boms', {})) (bomByItem[b.item_code] ??= []).push(b); } catch { /* noop */ }
+  // 품목별 필요수량(투입 기준): 모품목=지시수량, 반제품=지시수량×BOM 경로 소요량 — 첫 공정 fallback
+  const reqQtyMap = { [wo.item_code]: +wo.order_qty || 0 };
+  (function calc(code, q) {
+    for (const c of (bomByItem[code] || [])) {
+      if (itemTypeMap[c.component_code] === '반제품') {
+        const need = q * (+c.qty || 0);
+        reqQtyMap[c.component_code] = (reqQtyMap[c.component_code] || 0) + need;
+        calc(c.component_code, need);
+      }
+    }
+  })(wo.item_code, +wo.order_qty || 0);
 
   render();
 
@@ -268,9 +279,11 @@ export async function popDetail(root, params = {}) {
   // 공정 투입수량 = 직전 공정 양품(없으면 저장값/계획값) — 불량 제외 cascade
   function effInput(p) {
     if (+p.input_qty > 0) return +p.input_qty;
-    const chain = chainOf(p.item_code || wo.item_code);
+    const code = p.item_code || wo.item_code;
+    const chain = chainOf(code);
     const idx = chain.findIndex(x => x.id === p.id);
-    if (idx <= 0) return +p.input_qty || 0;
+    // 첫 공정(또는 구버전 데이터)은 품목 필요수량으로 fallback
+    if (idx <= 0) return reqQtyMap[code] ?? (+wo.order_qty || 0);
     const prev = chain[idx - 1];
     return prev.status === '완료' ? (+prev.good_qty || 0) : effInput(prev);
   }
