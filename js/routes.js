@@ -14,6 +14,7 @@ import { departmentManager } from './pages/department.js';
 import { inspectionStandards } from './pages/inspectionStandard.js';
 import { ncrStatus } from './pages/ncrStatus.js';
 import { bomManager } from './pages/bom.js';
+import { toolStock } from './pages/toolStock.js';
 
 // 사이드바 메뉴 트리 (group icon + 하위 항목)
 export const MENU = [
@@ -100,7 +101,7 @@ export const ROUTES = {
   '/material/outbounds': { render: mat.materialOutbounds, title: '자재반출관리', group: '자재관리' },
   '/material/stocks': { render: mat.materialStocks, title: '자재현황', group: '자재관리' },
 
-  '/tool/stocks': { render: tool.toolStocks, title: '재고관리', group: '공구관리' },
+  '/tool/stocks': { render: toolStock, title: '재고관리', group: '공구관리' },
   '/tool/movements': { render: tool.toolMovements, title: '입·출고관리', group: '공구관리' },
   '/tool/disposals': { render: tool.toolDisposals, title: '폐기관리', group: '공구관리' },
 

@@ -152,6 +152,21 @@ export async function popDetail(root, params = {}) {
     }
   })(wo.item_code, +wo.order_qty || 0);
 
+  // 공구 투입(POP): 공정에 지정된 공구 + 입고 LOT 수명
+  let allTools = [], toolLots = [], toolUsages = [];
+  try { allTools = (await db.all('tools', {})).filter(t => t.use_yn !== false); } catch { allTools = []; }
+  try { toolLots = (await db.all('tool_movements', {})).filter(m => m.move_type === '입고'); } catch { toolLots = []; }
+  try { toolUsages = await db.all('tool_usages', {}); } catch { toolUsages = []; }
+  const toolsForProcess = (procName) => allTools.filter(t => t.process && t.process === procName);
+  function lotsForTool(code) {
+    const t = allTools.find(x => x.code === code) || {}; const life1 = +t.life_count || 0;
+    return toolLots.filter(m => m.tool_code === code).map(m => {
+      const used = toolUsages.filter(u => u.lot_no === m.move_no).reduce((s, u) => s + (+u.use_qty || 0), 0);
+      const remain = life1 > 0 ? Math.max(0, life1 * (+m.qty || 0) - used) : null;
+      return { move_no: m.move_no, move_date: m.move_date, remain };
+    });
+  }
+
   render();
 
   function render() {
@@ -267,6 +282,54 @@ export async function popDetail(root, params = {}) {
 
     slot.querySelectorAll('[data-start]').forEach(b => b.onclick = () => startProc(b.closest('[data-id]').dataset.id));
     slot.querySelectorAll('[data-end]').forEach(b => b.onclick = () => endProc(b.closest('[data-id]').dataset.id));
+    slot.querySelectorAll('[data-tool]').forEach(b => b.onclick = () => openToolUse(b.closest('[data-id]').dataset.id));
+  }
+
+  // 공구 투입 (선택사항) — 진행 공정에서 그 공정에 지정된 공구를 LOT 기준으로 투입
+  function openToolUse(id) {
+    const p = procs.find(x => String(x.id) === String(id));
+    const tools = toolsForProcess(p.process_name);
+    if (!tools.length) { toast('이 공정에 지정된 공구가 없습니다.', 'error'); return; }
+    const defQty = effInput(p); // 투입 횟수 기본 = 지시(투입)수량
+    const body = document.createElement('form');
+    body.className = 'form-grid';
+    body.innerHTML = `
+      <div class="field col-2"><label>공정</label><input class="input" value="${escapeHtml(p.process_name || '')}" readonly></div>
+      <div class="field"><label>공구 <span class="req">*</span></label>
+        <select class="select" name="tool"><option value="">선택</option>${tools.map(t => `<option value="${escapeHtml(t.code)}">${escapeHtml(t.code)} · ${escapeHtml(t.name)}</option>`).join('')}</select></div>
+      <div class="field"><label>투입 LOT <span class="req">*</span></label>
+        <select class="select" name="lot"><option value="">공구를 먼저 선택</option></select></div>
+      <div class="field"><label>투입 횟수 <span class="req">*</span></label><input class="input" name="use_qty" type="number" min="0" step="any" value="${defQty}"></div>
+      <div class="field"><label>작업자</label>
+        <select class="select" name="worker"><option value="">선택</option>${users.map(u => `<option value="${escapeHtml(u.name)}" ${u.name === getWorker() ? 'selected' : ''}>${escapeHtml(u.name)}</option>`).join('')}</select></div>`;
+    body.querySelector('[name="tool"]').addEventListener('change', (e) => {
+      const lots = lotsForTool(e.target.value);
+      const sel = body.querySelector('[name="lot"]');
+      sel.innerHTML = lots.length
+        ? `<option value="">선택</option>` + lots.map(l => `<option value="${escapeHtml(l.move_no)}">${escapeHtml(l.move_no)} (${(l.move_date || '').slice(0, 10)}) · 남은 ${l.remain === null ? '∞' : num(l.remain)}</option>`).join('')
+        : `<option value="">입고 LOT 없음 — 입·출고관리에서 입고 등록 필요</option>`;
+    });
+    openModal({
+      title: '공구 투입', body,
+      footer: `<button class="btn" data-cancel>취소</button><button class="btn btn--primary" data-ok>${icon('check', 16)} 투입</button>`,
+      onMount: ({ footEl, close }) => {
+        footEl.querySelector('[data-cancel]').onclick = close;
+        footEl.querySelector('[data-ok]').onclick = async () => {
+          const g = (n) => body.querySelector(`[name="${n}"]`).value;
+          if (!g('tool')) { toast('공구를 선택하세요.', 'error'); return; }
+          if (!g('lot')) { toast('투입 LOT을 선택하세요.', 'error'); return; }
+          const qty = Number(g('use_qty')) || 0;
+          if (qty <= 0) { toast('투입 횟수를 입력하세요.', 'error'); return; }
+          try {
+            const all = await db.all('tool_usages', {});
+            const use_no = nextDocNo('TU', all.map(x => x.use_no));
+            await db.insert('tool_usages', { use_no, use_date: todayStr(), tool_code: g('tool'), lot_no: g('lot'), use_qty: qty, wo_no: wo.wo_no, process: p.process_name, worker: g('worker') || getWorker() });
+            toolUsages = await db.all('tool_usages', {}); // 잔여수명 갱신
+            close(); toast(`공구 투입(${num(qty)}회)이 기록되었습니다.`); render();
+          } catch (e) { toast(e.message || '투입 실패', 'error'); }
+        };
+      },
+    });
   }
 
   // 반제품 공정이 모두 끝나야 완제품(모품목) 공정 시작 가능
@@ -296,7 +359,10 @@ export async function popDetail(root, params = {}) {
   function stepButtons(p) {
     const st = p.status || '대기';
     if (st === '완료') return `<span class="badge badge--success" style="height:36px;padding:0 16px;font-size:14px">완료</span>`;
-    if (st === '진행') return `<button class="btn btn--pop btn--end" data-end>${icon('check', 18)} 종료</button>`;
+    if (st === '진행') {
+      const toolBtn = toolsForProcess(p.process_name).length ? `<button class="btn btn--pop" data-tool style="background:var(--surface);color:var(--text)">${icon('tool', 16)} 공구투입</button>` : '';
+      return `${toolBtn}<button class="btn btn--pop btn--end" data-end>${icon('check', 18)} 종료</button>`;
+    }
     const blocked = stepBlockReason(p);
     if (blocked) return `<button class="btn btn--pop" disabled title="${blocked} 시작 가능">${icon('clock', 18)} 대기</button>`;
     return `<button class="btn btn--pop btn--start" data-start>${icon('activity', 18)} 시작</button>`;

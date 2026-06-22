@@ -124,7 +124,8 @@ create table if not exists tools (
   tool_type     text,                           -- 절삭 / 측정 / 지그 / 기타
   spec          text,
   maker         text,
-  life_count    int default 0,                  -- 수명(횟수)
+  life_count    int default 0,                  -- 수명(횟수, 1개당)
+  process       text,                           -- 사용 공정(POP 투입 대상 공정)
   unit          text default 'EA',
   safety_stock  numeric default 0,
   location      text,
@@ -133,6 +134,23 @@ create table if not exists tools (
   created_at    timestamptz default now(),
   updated_at    timestamptz default now()
 );
+
+-- 1-7b 공구 투입 이력 (입고 LOT별 사용 횟수 차감)
+create table if not exists tool_usages (
+  id            uuid primary key default uuid_generate_v4(),
+  use_no        text,
+  use_date      date default current_date,
+  tool_code     text not null,
+  lot_no        text,                           -- 입고 LOT(tool_movements.move_no)
+  use_qty       numeric default 0,              -- 사용(횟수)
+  wo_no         text,
+  process       text,
+  worker        text,
+  remark        text,
+  created_at    timestamptz default now(),
+  updated_at    timestamptz default now()
+);
+create index if not exists idx_toolusage_tool on tool_usages(tool_code);
 
 -- 1-8 설비관리
 create table if not exists equipments (
@@ -530,7 +548,7 @@ begin
       'work_orders','production_results','material_inbounds','material_outbounds',
       'tool_movements','tool_disposals','inspection_standards','incoming_inspections',
       'nonconformances','shipping_inspections','work_order_processes','process_equipments',
-      'inspection_details','boms'
+      'inspection_details','boms','tool_usages'
     ])
   loop
     execute format('drop trigger if exists trg_%I_updated on %I;', t, t);
@@ -551,7 +569,7 @@ begin
       'work_orders','production_results','material_inbounds','material_outbounds',
       'tool_movements','tool_disposals','inspection_standards','incoming_inspections',
       'nonconformances','shipping_inspections','work_order_processes','process_equipments',
-      'inspection_details','boms'
+      'inspection_details','boms','tool_usages'
     ])
   loop
     execute format('alter table %I enable row level security;', t);

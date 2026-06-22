@@ -63,12 +63,12 @@ insert into processes (code, name, process_type, work_center, std_time, setup_ti
 on conflict (code) do nothing;
 
 -- ---------- 1-7 공구 (5) ----------
-insert into tools (code, name, tool_type, spec, maker, life_count, unit, safety_stock, location, use_yn) values
-  ('T-001','엔드밀 Ø10','절삭','Ø10 4날','YG-1',500,'EA',10,'공구실 A-1', true),
-  ('T-002','드릴 Ø6.8','절삭','Ø6.8 HSS','OSG',800,'EA',15,'공구실 A-2', true),
-  ('T-003','버니어캘리퍼스','측정','0-150mm','Mitutoyo',0,'EA',5,'검사실', true),
-  ('T-004','조립지그 A','지그','P-1001용','자체제작',0,'EA',2,'조립라인', true),
-  ('T-005','마이크로미터','측정','0-25mm','Mitutoyo',0,'EA',5,'검사실', true)
+insert into tools (code, name, tool_type, spec, maker, life_count, process, unit, safety_stock, location, use_yn) values
+  ('T-001','엔드밀 Ø10','절삭','Ø10 4날','YG-1',500,'CNC 황삭','EA',10,'공구실 A-1', true),
+  ('T-002','드릴 Ø6.8','절삭','Ø6.8 HSS','OSG',800,'CNC 정삭','EA',15,'공구실 A-2', true),
+  ('T-003','버니어캘리퍼스','측정','0-150mm','Mitutoyo',0,'검사','EA',5,'검사실', true),
+  ('T-004','조립지그 A','지그','P-1001용','자체제작',0,'조립','EA',2,'조립라인', true),
+  ('T-005','마이크로미터','측정','0-25mm','Mitutoyo',0,'검사','EA',5,'검사실', true)
 on conflict (code) do nothing;
 
 -- ---------- 1-8 설비 (5) ----------

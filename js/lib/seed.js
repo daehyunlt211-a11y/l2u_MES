@@ -125,11 +125,11 @@ export const SEED = {
     { item_code: 'P-1004', component_code: 'M-4001', component_name: '볼트 M6x20', qty: 4, unit: 'EA' },
   ],
   tools: [
-    { code: 'T-001', name: '엔드밀 Ø10', tool_type: '절삭', spec: 'Ø10 4날', maker: 'YG-1', life_count: 500, unit: 'EA', safety_stock: 10, location: '공구실 A-1', use_yn: true },
-    { code: 'T-002', name: '드릴 Ø6.8', tool_type: '절삭', spec: 'Ø6.8 HSS', maker: 'OSG', life_count: 800, unit: 'EA', safety_stock: 15, location: '공구실 A-2', use_yn: true },
-    { code: 'T-003', name: '버니어캘리퍼스', tool_type: '측정', spec: '0-150mm', maker: 'Mitutoyo', life_count: 0, unit: 'EA', safety_stock: 5, location: '검사실', use_yn: true },
-    { code: 'T-004', name: '조립지그 A', tool_type: '지그', spec: 'P-1001용', maker: '자체제작', life_count: 0, unit: 'EA', safety_stock: 2, location: '조립라인', use_yn: true },
-    { code: 'T-005', name: '마이크로미터', tool_type: '측정', spec: '0-25mm', maker: 'Mitutoyo', life_count: 0, unit: 'EA', safety_stock: 5, location: '검사실', use_yn: true },
+    { code: 'T-001', name: '엔드밀 Ø10', tool_type: '절삭', spec: 'Ø10 4날', maker: 'YG-1', life_count: 500, process: 'CNC 황삭', unit: 'EA', safety_stock: 10, location: '공구실 A-1', use_yn: true },
+    { code: 'T-002', name: '드릴 Ø6.8', tool_type: '절삭', spec: 'Ø6.8 HSS', maker: 'OSG', life_count: 800, process: 'CNC 정삭', unit: 'EA', safety_stock: 15, location: '공구실 A-2', use_yn: true },
+    { code: 'T-003', name: '버니어캘리퍼스', tool_type: '측정', spec: '0-150mm', maker: 'Mitutoyo', life_count: 0, process: '검사', unit: 'EA', safety_stock: 5, location: '검사실', use_yn: true },
+    { code: 'T-004', name: '조립지그 A', tool_type: '지그', spec: 'P-1001용', maker: '자체제작', life_count: 0, process: '조립', unit: 'EA', safety_stock: 2, location: '조립라인', use_yn: true },
+    { code: 'T-005', name: '마이크로미터', tool_type: '측정', spec: '0-25mm', maker: 'Mitutoyo', life_count: 0, process: '검사', unit: 'EA', safety_stock: 5, location: '검사실', use_yn: true },
   ],
   equipments: [
     { code: 'CNC-01', name: 'MCT 머시닝센터 1호기', equip_type: '가공기', model: 'DNM-500', maker: '두산', work_center: '가공1라인', install_date: '2021-03-15', status: '정상', use_yn: true },
