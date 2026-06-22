@@ -63,13 +63,14 @@ export async function openNonconformanceForm({ prefill = {}, onSaved, mandatory 
         try {
           const all = await db.all('nonconformances', {});
           const ncr_no = nextDocNo('NC', all.map(x => x.ncr_no));
-          await db.insert('nonconformances', {
+          const record = {
             ncr_no, occur_date: g('occur_date') || todayStr(), process: g('process'),
             item_code: g('item_code'), item_name: g('item_name'), defect_type: g('defect_type'),
             defect_qty: Number(g('defect_qty')) || 0, cause: g('cause'), action: g('action'),
             action_type: g('action_type'), worker: g('worker'), status: g('status'), remark: g('remark'),
-          });
-          close(); toast(`부적합(${ncr_no})이 등록되었습니다.`); onSaved?.();
+          };
+          await db.insert('nonconformances', record);
+          close(); toast(`부적합(${ncr_no})이 등록되었습니다.`); onSaved?.(record);
         } catch (e) { toast(e.message || '등록 실패', 'error'); }
       };
     },

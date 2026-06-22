@@ -297,9 +297,11 @@ create table if not exists work_order_processes (
   status        text default '대기',            -- 대기 / 진행 / 완료
   start_at      timestamptz,
   end_at        timestamptz,
+  input_qty     numeric default 0,              -- 투입수량(이전 공정 양품에서 cascade)
   good_qty      numeric default 0,
   defect_qty    numeric default 0,
   work_time     numeric default 0,
+  is_rework     boolean default false,          -- 재작업 공정 단계 여부
   remark        text,
   created_at    timestamptz default now(),
   updated_at    timestamptz default now()

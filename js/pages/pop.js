@@ -223,6 +223,8 @@ export async function popDetail(root, params = {}) {
         occur_date: todayStr(), process: proc?.process_name || '', item_code: code, item_name: itemNameOf(code),
         defect_qty: proc?.defect_qty || 0, worker: proc?.worker || getWorker(), status: '처리중',
       },
+      // 조치구분이 '재작업'이면 그 수량만큼 같은 공정의 재작업 단계 추가
+      onSaved: (ncr) => { if (ncr && ncr.action_type === '재작업') createReworkStep(proc, +ncr.defect_qty || 0); },
     });
   }
 
@@ -234,9 +236,10 @@ export async function popDetail(root, params = {}) {
       return `<div class="proc-step s-${escapeHtml(st)}" data-id="${p.id}">
         <div class="proc-step__seq">${escapeHtml(String(p.seq ?? ''))}</div>
         <div class="proc-step__body">
-          <div class="proc-step__name">${isSub ? `<span class="badge badge--info" style="margin-right:6px">${escapeHtml(itemTypeOf(p.item_code))} ${escapeHtml(itemNameOf(p.item_code))}</span>` : ''}${escapeHtml(p.process_name || p.process_code || '공정')}</div>
+          <div class="proc-step__name">${p.is_rework ? `<span class="badge badge--danger" style="margin-right:6px">재작업</span>` : (isSub ? `<span class="badge badge--info" style="margin-right:6px">${escapeHtml(itemTypeOf(p.item_code))} ${escapeHtml(itemNameOf(p.item_code))}</span>` : '')}${escapeHtml(p.process_name || p.process_code || '공정')}</div>
           <div class="proc-step__sub">
             ${p.process_code ? `<span>${escapeHtml(p.process_code)}</span>` : ''}
+            <span>투입 <b class="mono">${num(effInput(p))}</b></span>
             ${p.equipment ? `<span>설비 ${escapeHtml(p.equipment)}</span>` : ''}
             ${p.worker ? `<span>작업자 ${escapeHtml(p.worker)}</span>` : ''}
             ${st === '완료' ? `<span style="color:var(--success);font-weight:700">양품 ${num(p.good_qty)} · 불량 ${num(p.defect_qty)}</span>` : ''}
@@ -258,21 +261,39 @@ export async function popDetail(root, params = {}) {
   // 반제품 공정이 모두 끝나야 완제품(모품목) 공정 시작 가능
   function subPending() { return procs.some(x => x.item_code && x.item_code !== wo.item_code && x.status !== '완료'); }
   function isParentStep(p) { return !p.item_code || p.item_code === wo.item_code; }
+  // 같은 품목 공정 체인(순서대로) / 다음 본공정(재작업 제외) / 이전 미완료 여부
+  function chainOf(code) { return procs.filter(x => (x.item_code || wo.item_code) === code).sort((a, b) => (+a.seq || 0) - (+b.seq || 0)); }
+  function nextMainStep(p) { const code = p.item_code || wo.item_code; return chainOf(code).find(x => (+x.seq || 0) > (+p.seq || 0) && !x.is_rework); }
+  function priorPending(p) { const code = p.item_code || wo.item_code; return chainOf(code).some(x => (+x.seq || 0) < (+p.seq || 0) && x.status !== '완료'); }
+  // 공정 투입수량 = 직전 공정 양품(없으면 저장값/계획값) — 불량 제외 cascade
+  function effInput(p) {
+    if (+p.input_qty > 0) return +p.input_qty;
+    const chain = chainOf(p.item_code || wo.item_code);
+    const idx = chain.findIndex(x => x.id === p.id);
+    if (idx <= 0) return +p.input_qty || 0;
+    const prev = chain[idx - 1];
+    return prev.status === '완료' ? (+prev.good_qty || 0) : effInput(prev);
+  }
+  function stepBlockReason(p) {
+    if (priorPending(p)) return '이전 공정 완료 후';
+    if (isParentStep(p) && subPending()) return '반제품 공정 완료 후';
+    return null;
+  }
 
   function stepButtons(p) {
     const st = p.status || '대기';
     if (st === '완료') return `<span class="badge badge--success" style="height:36px;padding:0 16px;font-size:14px">완료</span>`;
     if (st === '진행') return `<button class="btn btn--pop btn--end" data-end>${icon('check', 18)} 종료</button>`;
-    if (isParentStep(p) && subPending()) {
-      return `<button class="btn btn--pop" disabled title="반제품 공정 완료 후 시작 가능">${icon('clock', 18)} 반제품 대기</button>`;
-    }
+    const blocked = stepBlockReason(p);
+    if (blocked) return `<button class="btn btn--pop" disabled title="${blocked} 시작 가능">${icon('clock', 18)} 대기</button>`;
     return `<button class="btn btn--pop btn--start" data-start>${icon('activity', 18)} 시작</button>`;
   }
 
   // 공정 시작 — 작업자·설비호기를 선택 (설비는 해당 표준공정에 등록된 설비만)
   async function startProc(id) {
     const p = procs.find(x => String(x.id) === String(id));
-    if (isParentStep(p) && subPending()) { toast('반제품 공정을 모두 완료한 뒤 완제품 공정을 시작할 수 있습니다.', 'error'); return; }
+    const blk = stepBlockReason(p);
+    if (blk) { toast(`${blk} 시작할 수 있습니다.`, 'error'); return; }
     // 설비호기 후보 = 표준공정관리에서 이 공정에 등록한 설비만.
     // (등록 0건이면 빈 목록으로 두고 안내 표시. process_equipments 테이블이 없을 때만 전체 폴백)
     let equipOptions = equips;
@@ -342,34 +363,46 @@ export async function popDetail(root, params = {}) {
 
   function endProc(id) {
     const p = procs.find(x => String(x.id) === String(id));
-    const remaining = Math.max(0, (+wo.order_qty || 0) - 0);
+    const input = effInput(p);
     const body = document.createElement('form');
     body.className = 'form-grid';
     body.innerHTML = `
-      <div class="field"><label>양품수량 <span class="req">*</span></label><input class="input" name="good_qty" type="number" min="0" step="any" value="${escapeHtml(wo.order_qty ?? 0)}"/></div>
-      <div class="field"><label>불량수량</label><input class="input" name="defect_qty" type="number" min="0" step="any" value="0"/></div>
-      <div class="field col-2"><label>비고</label><input class="input" name="remark" placeholder="특이사항"/></div>`;
+      <div class="field"><label>투입수량</label><input class="input mono" name="input_qty" value="${num(input)}" readonly></div>
+      <div class="field"><label>불량수량</label><input class="input" name="defect_qty" type="number" min="0" max="${input}" step="any" value="0"/></div>
+      <div class="field"><label>양품수량 (자동)</label><input class="input mono" name="good_qty" value="${num(input)}" readonly></div>
+      <div class="field"><label>비고</label><input class="input" name="remark" placeholder="특이사항"/></div>`;
+    // 불량 입력 시 양품 자동 = 투입 - 불량
+    body.querySelector('[name="defect_qty"]').addEventListener('input', (e) => {
+      let d = Number(e.target.value) || 0; if (d > input) { d = input; e.target.value = d; }
+      body.querySelector('[name="good_qty"]').value = num(input - d);
+    });
     openModal({
-      title: `${p.process_name} 공정 종료`,
+      title: `${p.process_name} 공정 종료 (투입 ${num(input)})`,
       body,
       footer: `<button class="btn" data-cancel>취소</button><button class="btn btn--primary" data-ok>${icon('check', 16)} 종료 처리</button>`,
       onMount: ({ footEl, close }) => {
         footEl.querySelector('[data-cancel]').onclick = close;
         footEl.querySelector('[data-ok]').onclick = async () => {
-          const good = Number(body.querySelector('[name="good_qty"]').value) || 0;
-          const defect = Number(body.querySelector('[name="defect_qty"]').value) || 0;
+          const defect = Math.min(input, Number(body.querySelector('[name="defect_qty"]').value) || 0);
+          const good = input - defect;
           const remark = body.querySelector('[name="remark"]').value.trim();
           const endAt = new Date();
           const startAt = p.start_at ? new Date(p.start_at) : endAt;
           const workTime = Math.max(0, Math.round((endAt - startAt) / 60000));
           try {
-            const upd = await db.update('work_order_processes', id, { status: '완료', end_at: endAt.toISOString(), good_qty: good, defect_qty: defect, work_time: workTime, remark });
-            Object.assign(p, upd || { status: '완료', end_at: endAt.toISOString(), good_qty: good, defect_qty: defect, work_time: workTime, remark });
+            const upd = await db.update('work_order_processes', id, { status: '완료', end_at: endAt.toISOString(), input_qty: input, good_qty: good, defect_qty: defect, work_time: workTime, remark });
+            Object.assign(p, upd || { status: '완료', end_at: endAt.toISOString(), input_qty: input, good_qty: good, defect_qty: defect, work_time: workTime, remark });
+            // 다음 본공정에 양품수량 cascade (불량 제외)
+            const nm = nextMainStep(p);
+            if (nm) {
+              const next = p.is_rework ? (+nm.input_qty || 0) + good : good; // 재작업이면 합산, 본공정이면 대체
+              try { await db.update('work_order_processes', nm.id, { input_qty: next }); nm.input_qty = next; } catch { /* noop */ }
+            }
             await createResult(p, good, defect, workTime);
             await syncWoStatus();
             close();
             render();
-            // 불량 발생 시 해당 공정과 연계한 부적합 등록 진행
+            // 불량 발생 시 해당 공정과 연계한 부적합 등록 진행 (재작업이면 재작업 공정 추가)
             if (defect > 0) {
               toast(`[${p.process_name}] 불량 ${num(defect)}EA — 부적합 등록을 진행합니다.`, 'info');
               openNcr({ ...p, defect_qty: defect });
@@ -380,6 +413,25 @@ export async function popDetail(root, params = {}) {
         };
       },
     });
+  }
+
+  // 재작업 공정 단계 추가 (해당 공정 뒤에 삽입, 재작업 수량만큼 다시 진행)
+  async function createReworkStep(proc, qty) {
+    qty = +qty || 0;
+    if (qty <= 0) return;
+    const baseSeq = +proc.seq || 0;
+    const cnt = procs.filter(x => (x.item_code || wo.item_code) === (proc.item_code || wo.item_code) && (+x.seq || 0) > baseSeq && (+x.seq || 0) < baseSeq + 10).length;
+    try {
+      await db.insert('work_order_processes', {
+        wo_no: wo.wo_no, item_code: proc.item_code, seq: baseSeq + 1 + cnt,
+        process_code: proc.process_code || '', process_name: '[재작업] ' + (proc.process_name || ''),
+        equipment: '', status: '대기', input_qty: qty, good_qty: 0, defect_qty: 0, work_time: 0, is_rework: true, remark: '재작업',
+      });
+      procs = await db.all('work_order_processes', { filters: { wo_no: wo.wo_no }, sort: 'seq' });
+      await syncWoStatus();
+      render();
+      toast(`재작업 공정(${num(qty)}EA)이 추가되었습니다.`, 'info');
+    } catch (e) { toast(e.message || '재작업 공정 추가 실패', 'error'); }
   }
 
   // 생산실적 자동 등록
@@ -429,17 +481,31 @@ async function loadOrCreateProcesses(wo) {
     order.push(code);
   })(wo.item_code);
 
+  // 품목별 필요수량(투입 기준): 모품목=지시수량, 반제품=지시수량×BOM 경로 소요량
+  const reqQty = { [wo.item_code]: +wo.order_qty || 0 };
+  (function calc(code, q) {
+    for (const c of (bomByItem[code] || [])) {
+      if (itemType[c.component_code] === '반제품') {
+        const need = q * (+c.qty || 0);
+        reqQty[c.component_code] = (reqQty[c.component_code] || 0) + need;
+        calc(c.component_code, need);
+      }
+    }
+  })(wo.item_code, +wo.order_qty || 0);
+
   let seq = 0;
   for (const code of order) {
+    const base = reqQty[code] || +wo.order_qty || 0;
     let routing = [];
     try { routing = await db.all('item_processes', { filters: { item_code: code }, sort: 'seq' }); } catch { routing = []; }
     if (routing.length) {
+      let idx = 0;
       for (const r of routing) {
-        seq += 10;
+        seq += 10; idx++;
         await db.insert('work_order_processes', {
           wo_no: wo.wo_no, item_code: code, seq,
           process_code: r.process_code || '', process_name: r.process_name || r.process_code || '공정',
-          equipment: '', status: '대기', good_qty: 0, defect_qty: 0, work_time: 0,
+          equipment: '', status: '대기', input_qty: idx === 1 ? base : 0, good_qty: 0, defect_qty: 0, work_time: 0, is_rework: false,
         });
       }
     } else if (code === wo.item_code) {
@@ -447,7 +513,7 @@ async function loadOrCreateProcesses(wo) {
       seq += 10;
       await db.insert('work_order_processes', {
         wo_no: wo.wo_no, item_code: code, seq, process_code: '',
-        process_name: wo.process || '작업', equipment: '', status: '대기', good_qty: 0, defect_qty: 0, work_time: 0,
+        process_name: wo.process || '작업', equipment: '', status: '대기', input_qty: base, good_qty: 0, defect_qty: 0, work_time: 0, is_rework: false,
       });
     }
   }
